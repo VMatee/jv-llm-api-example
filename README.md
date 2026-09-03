@@ -1,8 +1,10 @@
-# JV LLM API Python example
+# JV LLM API examples
 
-A small Python client for asking questions through the JV LLM API. It supports
-plain-text prompts, file attachments, conversation follow-ups, JSON output,
-and downloading generated files.
+Small Python and C++ clients for asking questions through the JV LLM API. The
+Python client supports plain-text prompts, file attachments, conversation
+follow-ups, JSON output, and downloading generated files. The C++17 client
+provides the core login, prompt, attachment, conversation, polling, and JSON
+workflow with libcurl and nlohmann-json.
 
 The example connects to `https://ai.openjvspace.com` by default. You need a JV
 LLM username and password before using it.
@@ -18,8 +20,8 @@ LLM username and password before using it.
 Clone this repository and enter its directory:
 
 ```bash
-git clone https://github.com/VMatee/jv-llm-api-python-example.git
-cd jv-llm-api-python-example
+git clone https://github.com/VMatee/jv-llm-api-example.git
+cd jv-llm-api-example
 ```
 
 Create a virtual environment and install the dependency:
@@ -28,6 +30,16 @@ Create a virtual environment and install the dependency:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+```
+
+For the C++ example, see [cpp/README.md](cpp/README.md). Its short Linux build
+is:
+
+```bash
+sudo apt-get install cmake g++ libcurl4-openssl-dev nlohmann-json3-dev
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build cpp/build --parallel
+./cpp/build/jv_api_example "What are the three primary colors?"
 ```
 
 On Windows PowerShell, activate the environment with:
