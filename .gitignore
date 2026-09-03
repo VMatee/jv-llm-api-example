@@ -1,6 +1,7 @@
 .venv/
 .env
 .env.*
+/README.local.md
 .ruff_cache/
 __pycache__/
 *.py[cod]
