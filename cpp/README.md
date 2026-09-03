@@ -17,6 +17,9 @@ Provider, model, and reasoning mode are deliberately absent. The server uses
 the authenticated user's administrator-managed assignment. A normal API user
 cannot force ChatGPT, Gemini, a model, or a fallback route.
 
+Complete platform setup: [Linux](../docs/linux.md) ·
+[macOS](../docs/macos.md) · [Windows](../docs/windows.md)
+
 ## Dependencies
 
 - a C++17 compiler;
@@ -61,7 +64,9 @@ On Windows, the Release executable is normally:
 .\cpp\build\Release\jv_api_example.exe --help
 ```
 
-## Ask a question
+## Example 1: without an attachment
+
+Put the question first and do not add `--file`:
 
 ```bash
 ./cpp/build/jv_api_example "Explain recursion in simple terms."
@@ -81,11 +86,22 @@ The default username is `test`. Use another account with:
   --username your-username
 ```
 
-The program asks for the password without echoing it.
+The program asks for the password without echoing it. The client sends only
+the question as the job input.
 
-## Attach files
+## Example 2: with an attachment
 
-Repeat `--file` for multiple attachments:
+Add `--file` followed by the file path. This copy-paste example uses the safe
+sample document included in the repository:
+
+```bash
+./cpp/build/jv_api_example \
+  "Summarize the attached document." \
+  --file ./examples/sample-document.txt
+```
+
+To attach your own files, replace the sample path. Repeat `--file` for more
+than one attachment:
 
 ```bash
 ./cpp/build/jv_api_example \

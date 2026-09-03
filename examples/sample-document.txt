@@ -1,0 +1,10 @@
+JV LLM API attachment example
+
+This harmless sample document is included so users can test the attachment
+workflow without preparing a separate file. It contains no credentials or
+private information.
+
+Example project status:
+- API documentation is available.
+- Python, C++, and C clients are available.
+- Text-only and attachment requests use the same client program.

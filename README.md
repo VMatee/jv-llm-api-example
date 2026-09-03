@@ -19,6 +19,18 @@ LLM username and password before using it.
 All languages require a JV LLM account and Internet access to
 `https://ai.openjvspace.com`.
 
+## Choose your operating system
+
+For a complete setup from a clean computer, use the guide matching your
+system:
+
+- [Linux setup and examples](docs/linux.md)
+- [macOS setup and examples](docs/macos.md)
+- [Windows setup and examples](docs/windows.md)
+
+Each operating-system guide installs Python, C++, and C dependencies and then
+shows both text-only and file-attachment requests.
+
 ## Installation
 
 Clone this repository and enter its directory:
@@ -61,18 +73,72 @@ On Windows PowerShell, activate the environment with:
 python -m pip install -r requirements.txt
 ```
 
-## Ask a question
+## Quick examples: with and without attachments
+
+Each language uses one client for both request types. Omit `--file` for a
+text-only request. Add `--file PATH` when the model should receive a document.
+The repository includes `examples/sample-document.txt`, so every attachment
+example below is ready to copy and run.
+
+### Python
+
+Without an attachment:
+
+```bash
+python jv_api_example.py "Explain recursion in simple terms."
+```
+
+With an attachment:
+
+```bash
+python jv_api_example.py \
+  "Summarize the attached document." \
+  --file ./examples/sample-document.txt
+```
+
+### C++
+
+Without an attachment:
+
+```bash
+./cpp/build/jv_api_example "Explain recursion in simple terms."
+```
+
+With an attachment:
+
+```bash
+./cpp/build/jv_api_example \
+  "Summarize the attached document." \
+  --file ./examples/sample-document.txt
+```
+
+### C
+
+Without an attachment:
+
+```bash
+./c/build/jv_api_example "Explain recursion in simple terms."
+```
+
+With an attachment:
+
+```bash
+./c/build/jv_api_example \
+  "Summarize the attached document." \
+  --file ./examples/sample-document.txt
+```
+
+In every case, the first argument is the question. `--file` is optional and
+may be repeated to attach several files. The client signs in, submits exactly
+one job, polls that job, prints the result, and signs out.
+
+## Account selection and password
 
 The remainder of this page is the Python quick reference. The dedicated
 [Python guide](python/README.md) collects its installation and usage examples
-in one place. Run the Python client with your question:
-
-```bash
-python jv_api_example.py "What are the three primary colors?"
-```
-
-The default username is `test`. The program asks for the password without
-displaying it. Use `--username` if your account has a different username:
+in one place. The default username is `test`. The program asks for the
+password without displaying it. Use `--username` if your account has a
+different username:
 
 ```bash
 python jv_api_example.py \
@@ -83,7 +149,7 @@ python jv_api_example.py \
 The client logs in, creates a job, displays status changes, prints the final
 answer, and logs out.
 
-## Submit files
+## Use your own attachments
 
 Use `--file` with an absolute or relative file path:
 

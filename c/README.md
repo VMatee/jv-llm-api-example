@@ -14,6 +14,9 @@ The client verifies HTTPS certificates, never accepts credentials on the
 command line, and never automatically repeats an ambiguous submission.
 Provider/model overrides are intentionally unavailable to normal users.
 
+Complete platform setup: [Linux](../docs/linux.md) ·
+[macOS](../docs/macos.md) · [Windows](../docs/windows.md)
+
 ## Dependencies
 
 - a C11 compiler;
@@ -58,7 +61,9 @@ On Windows, the Release executable is normally:
 .\c\build\Release\jv_api_example.exe --help
 ```
 
-## Ask a question
+## Example 1: without an attachment
+
+Put the question first and do not add `--file`:
 
 ```bash
 ./c/build/jv_api_example "Explain recursion in simple terms."
@@ -78,7 +83,21 @@ The username defaults to `test`. Use another account with:
   --username your-username
 ```
 
-## Attach files
+The client sends only the question as the job input.
+
+## Example 2: with an attachment
+
+Add `--file` followed by the file path. This copy-paste example uses the safe
+sample document included in the repository:
+
+```bash
+./c/build/jv_api_example \
+  "Summarize the attached document." \
+  --file ./examples/sample-document.txt
+```
+
+To attach your own files, replace the sample path. Repeat `--file` for more
+than one attachment:
 
 ```bash
 ./c/build/jv_api_example \

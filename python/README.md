@@ -7,6 +7,9 @@ output, and verified response-file downloads.
 Provider, model, and reasoning controls are intentionally absent. The server
 uses the authenticated user's administrator-managed assignment.
 
+Complete platform setup: [Linux](../docs/linux.md) ·
+[macOS](../docs/macos.md) · [Windows](../docs/windows.md)
+
 ## Install
 
 Clone the repository and create an isolated environment:
@@ -29,7 +32,9 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-## Ask a question
+## Example 1: without an attachment
+
+Put the question first and do not add `--file`:
 
 ```bash
 python jv_api_example.py "Explain recursion in simple terms."
@@ -43,9 +48,22 @@ python jv_api_example.py \
   --username your-username
 ```
 
-The password prompt does not display the password.
+The password prompt does not display the password. The client sends only the
+question as the job input.
 
-## Attach files
+## Example 2: with an attachment
+
+Add `--file` followed by the file path. This copy-paste example uses the safe
+sample document included in the repository:
+
+```bash
+python jv_api_example.py \
+  "Summarize the attached document." \
+  --file ./examples/sample-document.txt
+```
+
+To attach your own files, replace the sample path. Repeat `--file` for more
+than one attachment:
 
 ```bash
 python jv_api_example.py \
