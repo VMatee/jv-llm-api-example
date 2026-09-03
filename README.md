@@ -1,19 +1,23 @@
 # JV LLM API examples
 
-Small Python and C++ clients for asking questions through the JV LLM API. The
-Python client supports plain-text prompts, file attachments, conversation
-follow-ups, JSON output, and downloading generated files. The C++17 client
-provides the core login, prompt, attachment, conversation, polling, and JSON
-workflow with libcurl and nlohmann-json.
+Small Python, C++, and C clients for asking questions through the JV LLM API.
+Every example follows the same safe login, submission, polling, and logout
+contract. Provider, model, reasoning mode, and fallback remain controlled by
+the user's server-side assignment.
 
 The example connects to `https://ai.openjvspace.com` by default. You need a JV
 LLM username and password before using it.
 
-## Requirements
+## Choose a language
 
-- Python 3.10 or newer
-- A JV LLM account
-- Internet access to `https://ai.openjvspace.com`
+| Language | Minimum | HTTP/JSON libraries | Guide |
+|---|---|---|---|
+| Python | Python 3.10 | requests | [Python guide](python/README.md) |
+| C++ | C++17 | libcurl, nlohmann-json | [C++ guide](cpp/README.md) |
+| C | C11 | libcurl, json-c | [C guide](c/README.md) |
+
+All languages require a JV LLM account and Internet access to
+`https://ai.openjvspace.com`.
 
 ## Installation
 
@@ -24,7 +28,7 @@ git clone https://github.com/VMatee/jv-llm-api-example.git
 cd jv-llm-api-example
 ```
 
-Create a virtual environment and install the dependency:
+For Python, create a virtual environment and install the dependency:
 
 ```bash
 python3 -m venv .venv
@@ -32,14 +36,22 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-For the C++ example, see [cpp/README.md](cpp/README.md). Its short Linux build
-is:
+For C++, see [cpp/README.md](cpp/README.md):
 
 ```bash
 sudo apt-get install cmake g++ libcurl4-openssl-dev nlohmann-json3-dev
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
 cmake --build cpp/build --parallel
 ./cpp/build/jv_api_example "What are the three primary colors?"
+```
+
+For C, see [c/README.md](c/README.md):
+
+```bash
+sudo apt-get install cmake gcc libcurl4-openssl-dev libjson-c-dev
+cmake -S c -B c/build -DCMAKE_BUILD_TYPE=Release
+cmake --build c/build --parallel
+./c/build/jv_api_example "What are the three primary colors?"
 ```
 
 On Windows PowerShell, activate the environment with:
@@ -51,7 +63,9 @@ python -m pip install -r requirements.txt
 
 ## Ask a question
 
-Run the client with your question:
+The remainder of this page is the Python quick reference. The dedicated
+[Python guide](python/README.md) collects its installation and usage examples
+in one place. Run the Python client with your question:
 
 ```bash
 python jv_api_example.py "What are the three primary colors?"

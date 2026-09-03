@@ -55,10 +55,22 @@ cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
 cmake --build cpp/build --parallel
 ```
 
+On Windows, the Release executable is normally:
+
+```powershell
+.\cpp\build\Release\jv_api_example.exe --help
+```
+
 ## Ask a question
 
 ```bash
 ./cpp/build/jv_api_example "Explain recursion in simple terms."
+```
+
+Windows PowerShell:
+
+```powershell
+.\cpp\build\Release\jv_api_example.exe "Explain recursion in simple terms."
 ```
 
 The default username is `test`. Use another account with:

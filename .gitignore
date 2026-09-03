@@ -1,5 +1,12 @@
 .venv/
+.env
+.env.*
 .ruff_cache/
 __pycache__/
 *.py[cod]
+*.log
+*.key
+*.pem
+results/
 cpp/build/
+c/build/

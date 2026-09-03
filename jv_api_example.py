@@ -451,13 +451,14 @@ def _show_progress(job: dict[str, Any]) -> None:
 
 def main() -> int:
     args = _build_parser().parse_args()
-    password = os.environ.get("JV_API_PASSWORD")
-    if password is None:
-        password = getpass.getpass(f"Password for {args.username}: ")
-
-    client = JVAIClient(args.base_url)
+    client: JVAIClient | None = None
     logout_error: JVAPIError | None = None
     try:
+        client = JVAIClient(args.base_url)
+        password = os.environ.get("JV_API_PASSWORD")
+        if password is None:
+            password = getpass.getpass(f"Password for {args.username}: ")
+
         login = client.login(args.username, password)
         user = login.get("user", {})
         display_name = user.get("username") if isinstance(user, dict) else args.username
@@ -503,11 +504,12 @@ def main() -> int:
         print("Interrupted. Any submitted server-side job continues.", file=sys.stderr)
         return 130
     finally:
-        try:
-            client.logout()
-        except JVAPIError as exc:
-            logout_error = exc
-        client.close()
+        if client is not None:
+            try:
+                client.logout()
+            except JVAPIError as exc:
+                logout_error = exc
+            client.close()
         if logout_error is not None:
             print(f"Warning: {logout_error}", file=sys.stderr)
 
