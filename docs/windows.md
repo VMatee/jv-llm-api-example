@@ -57,7 +57,7 @@ Keep PowerShell in this repository directory for the remaining commands.
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r .\python\requirements.txt
 ```
 
 If PowerShell blocks the activation script, allow scripts for only the current
@@ -97,7 +97,7 @@ Do not add `--file` when the request has no attachment.
 Python:
 
 ```powershell
-python .\jv_api_example.py "Explain recursion in simple terms."
+python .\python\jv_api_example.py "Explain recursion in simple terms."
 ```
 
 C++:
@@ -119,7 +119,7 @@ The repository includes a safe sample document. Add `--file` and its path:
 Python:
 
 ```powershell
-python .\jv_api_example.py `
+python .\python\jv_api_example.py `
   "Summarize the attached document." `
   --file .\examples\sample-document.txt
 ```
@@ -144,7 +144,7 @@ Replace the sample path with your file. Repeat `--file PATH` to attach
 multiple files. Put paths containing spaces inside quotes:
 
 ```powershell
-python .\jv_api_example.py `
+python .\python\jv_api_example.py `
   "Compare these documents." `
   --file "$HOME\Documents\report one.pdf" `
   --file "$HOME\Documents\report two.pdf"
@@ -155,7 +155,7 @@ python .\jv_api_example.py `
 The username defaults to `test`. Select another user with `--username`:
 
 ```powershell
-python .\jv_api_example.py "Return a short status." --username your-username
+python .\python\jv_api_example.py "Return a short status." --username your-username
 ```
 
 The client asks for the password without displaying it. For approved

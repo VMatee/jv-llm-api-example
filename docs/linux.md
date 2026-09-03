@@ -31,7 +31,7 @@ Keep the terminal in this repository directory for the remaining commands.
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r python/requirements.txt
 ```
 
 Activate the environment again with `source .venv/bin/activate` after opening
@@ -62,7 +62,7 @@ Do not add `--file` when the request has no attachment.
 Python:
 
 ```bash
-python jv_api_example.py "Explain recursion in simple terms."
+python ./python/jv_api_example.py "Explain recursion in simple terms."
 ```
 
 C++:
@@ -84,7 +84,7 @@ The repository includes a safe sample document. Add `--file` and its path:
 Python:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Summarize the attached document." \
   --file ./examples/sample-document.txt
 ```
@@ -109,7 +109,7 @@ Replace the sample path with your file. Repeat `--file PATH` to attach
 multiple files. Quote paths containing spaces:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Compare these documents." \
   --file "/home/your-user/Documents/report one.pdf" \
   --file "/home/your-user/Documents/report two.pdf"
@@ -120,7 +120,7 @@ python jv_api_example.py \
 The username defaults to `test`. Select another user with `--username`:
 
 ```bash
-python jv_api_example.py "Return a short status." --username your-username
+python ./python/jv_api_example.py "Return a short status." --username your-username
 ```
 
 The client asks for the password without displaying it. For approved

@@ -19,7 +19,7 @@ git clone https://github.com/VMatee/jv-llm-api-example.git
 cd jv-llm-api-example
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r python/requirements.txt
 ```
 
 Windows PowerShell:
@@ -29,7 +29,7 @@ git clone https://github.com/VMatee/jv-llm-api-example.git
 cd jv-llm-api-example
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install -r python/requirements.txt
 ```
 
 ## Example 1: without an attachment
@@ -37,13 +37,13 @@ python -m pip install -r requirements.txt
 Put the question first and do not add `--file`:
 
 ```bash
-python jv_api_example.py "Explain recursion in simple terms."
+python ./python/jv_api_example.py "Explain recursion in simple terms."
 ```
 
 The default username is `test`. To use another account:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Return a concise project status." \
   --username your-username
 ```
@@ -57,7 +57,7 @@ Add `--file` followed by the file path. This copy-paste example uses the safe
 sample document included in the repository:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Summarize the attached document." \
   --file ./examples/sample-document.txt
 ```
@@ -66,7 +66,7 @@ To attach your own files, replace the sample path. Repeat `--file` for more
 than one attachment:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Compare these reports." \
   --file ./report-one.pdf \
   --file ./report-two.pdf
@@ -77,7 +77,7 @@ python jv_api_example.py \
 Use the conversation ID printed by a completed request:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Now list the three most important actions." \
   --conversation-id YOUR_CONVERSATION_ID
 ```
@@ -89,7 +89,7 @@ unfinished.
 ## Download generated files
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Create an explanatory image." \
   --download-dir ./results
 ```
@@ -100,7 +100,7 @@ safe local filename before completing a download.
 ## Complete JSON
 
 ```bash
-python jv_api_example.py "Return a short status." --json
+python ./python/jv_api_example.py "Return a short status." --json
 ```
 
 ## Use from Python
@@ -108,7 +108,7 @@ python jv_api_example.py "Return a short status." --json
 ```python
 import getpass
 
-from jv_api_example import JVAIClient
+from python.jv_api_example import JVAIClient
 
 client = JVAIClient("https://ai.openjvspace.com")
 try:
@@ -132,7 +132,7 @@ export JV_API_USERNAME="your-username"
 read -rsp "JV LLM password: " JV_API_PASSWORD
 export JV_API_PASSWORD
 
-python jv_api_example.py "Return a concise status summary."
+python ./python/jv_api_example.py "Return a concise status summary."
 
 unset JV_API_PASSWORD
 ```
@@ -146,7 +146,7 @@ command-line arguments, URLs, Git history, or application logs.
 ## Options
 
 ```text
-python jv_api_example.py QUESTION [options]
+python ./python/jv_api_example.py QUESTION [options]
 
 --file PATH                 Attach a file; repeat for multiple files
 --conversation-id ID        Continue an owned conversation

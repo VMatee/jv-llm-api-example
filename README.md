@@ -31,6 +31,36 @@ system:
 Each operating-system guide installs Python, C++, and C dependencies and then
 shows both text-only and file-attachment requests.
 
+## Repository layout
+
+```text
+jv-llm-api-example/
+├── README.md
+├── python/
+│   ├── __init__.py
+│   ├── README.md
+│   ├── jv_api_example.py
+│   └── requirements.txt
+├── cpp/
+│   ├── README.md
+│   ├── CMakeLists.txt
+│   └── jv_api_example.cpp
+├── c/
+│   ├── README.md
+│   ├── CMakeLists.txt
+│   └── jv_api_example.c
+├── docs/
+│   ├── linux.md
+│   ├── macos.md
+│   └── windows.md
+└── examples/
+    └── sample-document.txt
+```
+
+Run the documented commands from the repository root. This keeps language
+implementations isolated while sharing the platform guides and harmless sample
+attachment.
+
 ## Installation
 
 Clone this repository and enter its directory:
@@ -45,7 +75,7 @@ For Python, create a virtual environment and install the dependency:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r python/requirements.txt
 ```
 
 For C++, see [cpp/README.md](cpp/README.md):
@@ -70,7 +100,7 @@ On Windows PowerShell, activate the environment with:
 
 ```powershell
 .venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install -r python/requirements.txt
 ```
 
 ## Quick examples: with and without attachments
@@ -85,13 +115,13 @@ example below is ready to copy and run.
 Without an attachment:
 
 ```bash
-python jv_api_example.py "Explain recursion in simple terms."
+python ./python/jv_api_example.py "Explain recursion in simple terms."
 ```
 
 With an attachment:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Summarize the attached document." \
   --file ./examples/sample-document.txt
 ```
@@ -141,7 +171,7 @@ password without displaying it. Use `--username` if your account has a
 different username:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Explain recursion in simple terms." \
   --username your-username
 ```
@@ -154,7 +184,7 @@ answer, and logs out.
 Use `--file` with an absolute or relative file path:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Summarize this document." \
   --file ./documents/report.pdf
 ```
@@ -162,7 +192,7 @@ python jv_api_example.py \
 Repeat `--file` to send multiple files:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Compare these two reports." \
   --file ./documents/report-one.pdf \
   --file ./documents/report-two.pdf
@@ -177,7 +207,7 @@ Every new question prints a conversation ID. Pass that value to a later call
 with `--conversation-id`:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Now list the three most important actions." \
   --conversation-id YOUR_CONVERSATION_ID
 ```
@@ -193,7 +223,7 @@ new follow-up while the previous turn in that conversation is still running.
 Use `--download-dir` when a response may include an image or file:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Create an image explaining a Gaussian process." \
   --download-dir ./results
 ```
@@ -207,7 +237,7 @@ Use `--json` to print the complete public job response instead of only the
 answer:
 
 ```bash
-python jv_api_example.py \
+python ./python/jv_api_example.py \
   "Return a short project status." \
   --json
 ```
@@ -233,7 +263,7 @@ export JV_API_USERNAME="your-username"
 read -rsp "JV LLM password: " JV_API_PASSWORD
 export JV_API_PASSWORD
 
-python jv_api_example.py "Return a concise status summary."
+python ./python/jv_api_example.py "Return a concise status summary."
 
 unset JV_API_PASSWORD
 ```
@@ -255,7 +285,7 @@ environment after the process exits.
 ## Command-line options
 
 ```text
-python jv_api_example.py QUESTION [options]
+python ./python/jv_api_example.py QUESTION [options]
 
 --file PATH                 Attach a file; repeat for multiple files
 --conversation-id ID        Continue an owned conversation
@@ -267,7 +297,8 @@ python jv_api_example.py QUESTION [options]
 --download-dir DIRECTORY    Download generated response files
 ```
 
-Run `python jv_api_example.py --help` to see the current option descriptions.
+Run `python ./python/jv_api_example.py --help` to see the current option
+descriptions.
 
 ## Use the client from Python
 
@@ -277,7 +308,7 @@ The `JVAIClient` class can be imported into another program:
 import getpass
 from pathlib import Path
 
-from jv_api_example import JVAIClient
+from python.jv_api_example import JVAIClient
 
 client = JVAIClient("https://ai.openjvspace.com")
 try:
