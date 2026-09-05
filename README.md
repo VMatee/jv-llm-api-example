@@ -1,6 +1,6 @@
 # JV LLM API examples
 
-Small Python, C++, and C clients for asking questions through the JV LLM API.
+Small Python, C++, C, and Rust clients for asking questions through the JV LLM API.
 Every example follows the same safe login, submission, polling, and logout
 contract. Provider, model, reasoning mode, and fallback remain controlled by
 the user's server-side assignment.
@@ -15,6 +15,7 @@ LLM username and password before using it.
 | Python | Python 3.10 | requests | [Python guide](python/README.md) |
 | C++ | C++17 | libcurl, nlohmann-json | [C++ guide](cpp/README.md) |
 | C | C11 | libcurl, json-c | [C guide](c/README.md) |
+| Rust | Current stable Rust | tokio, reqwest, serde | [Rust guide](rust/README.md) |
 
 All languages require a JV LLM account and Internet access to
 `https://ai.openjvspace.com`.
@@ -29,7 +30,8 @@ system:
 - [Windows setup and examples](docs/windows.md)
 
 Each operating-system guide installs Python, C++, and C dependencies and then
-shows both text-only and file-attachment requests.
+shows both text-only and file-attachment requests. For Rust installation and
+usage on these systems, see the [Rust guide](rust/README.md).
 
 ## Repository layout
 
@@ -49,6 +51,12 @@ jv-llm-api-example/
 │   ├── README.md
 │   ├── CMakeLists.txt
 │   └── jv_api_example.c
+├── rust/
+│   ├── Cargo.toml
+│   ├── Cargo.lock
+│   ├── README.md
+│   ├── src/          # reusable library and separate CLI
+│   └── tests/        # offline tests and opt-in live smoke test
 ├── docs/
 │   ├── linux.md
 │   ├── macos.md
@@ -156,6 +164,18 @@ With an attachment:
 ./c/build/jv_api_example \
   "Summarize the attached document." \
   --file ./examples/sample-document.txt
+```
+
+### Rust
+
+Build and run (see the [Rust guide](rust/README.md) for the reusable async
+library, conversation follow-ups, JSON output, and secure downloads):
+
+```bash
+cargo build --manifest-path rust/Cargo.toml --release
+cargo run --manifest-path rust/Cargo.toml -- "Explain recursion in simple terms."
+cargo run --manifest-path rust/Cargo.toml -- \
+  "Summarize the attached document." --file ./examples/sample-document.txt
 ```
 
 In every case, the first argument is the question. `--file` is optional and

@@ -11,3 +11,6 @@ __pycache__/
 results/
 cpp/build/
 c/build/
+
+# Rust build artifacts (keep Cargo.lock tracked)
+rust/target/
