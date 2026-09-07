@@ -1,7 +1,8 @@
 # JV LLM API C guide
 
-This C11 client demonstrates the safe core JV LLM API workflow using libcurl
-and json-c:
+This directory has two C11 clients using libcurl and json-c. The new
+`jv_responses_example` uses structured `/v1/responses`; `jv_api_example` keeps
+the established `/v1/jobs` features.
 
 1. read a password without displaying it;
 2. exchange the username/password for a temporary bearer token;
@@ -61,7 +62,37 @@ On Windows, the Release executable is normally:
 .\c\build\Release\jv_api_example.exe --help
 ```
 
-## Example 1: without an attachment
+CMake builds both executables.
+
+## Structured Responses API
+
+```bash
+./c/build/jv_responses_example "Explain recursion in simple terms."
+./c/build/jv_responses_example \
+  "Use the tool and report this client's platform." \
+  --tool-demo
+```
+
+The first command validates one terminal structured text message. The second
+declares one strict `get_client_platform` function, validates the completed
+call, runs it in this C process, and returns `function_call_output` in a second
+asynchronous round. JV Server never executes the local function. Read the
+[Responses API guide](../docs/responses-api.md) before adding tools.
+
+```text
+jv_responses_example QUESTION [options]
+
+--tool-demo                 Run one harmless client-side tool round
+--base-url URL              Override the API origin
+--username USERNAME         Override the default username
+--poll-interval SECONDS     Time between status checks; default: 3
+--wait-timeout SECONDS      Local polling timeout; default: 3600
+--json                      Print complete structured response JSON
+```
+
+## Legacy jobs, files, and conversations
+
+### Example 1: without an attachment
 
 Put the question first and do not add `--file`:
 
@@ -85,7 +116,7 @@ The username defaults to `test`. Use another account with:
 
 The client sends only the question as the job input.
 
-## Example 2: with an attachment
+### Example 2: with an attachment
 
 Add `--file` followed by the file path. This copy-paste example uses the safe
 sample document included in the repository:
@@ -106,7 +137,7 @@ than one attachment:
   --file ./report-two.pdf
 ```
 
-## Continue a conversation
+### Continue a conversation
 
 ```bash
 ./c/build/jv_api_example \
@@ -117,7 +148,7 @@ than one attachment:
 Send only the new prompt and new files. Do not submit another follow-up while
 the previous turn remains unfinished.
 
-## Complete JSON
+### Complete JSON
 
 ```bash
 ./c/build/jv_api_example "Return a short status." --json

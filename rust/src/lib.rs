@@ -7,9 +7,14 @@ mod client;
 mod error;
 mod files;
 mod jobs;
+mod responses;
 mod types;
 
 pub use client::{ClientConfig, DEFAULT_BASE_URL, JvClient, validate_base_url};
 pub use error::{Error, Result, parse_retry_after};
 pub use files::{safe_filename, validate_download_url};
+pub use responses::{
+    AgentResponse, FunctionTool, ResponseError, ResponseInput, ResponseOutput, ResponseRequest,
+    ResponseStatus, ToolChoice,
+};
 pub use types::{Job, JobResponse, JobStatus, JvJobRequest, ResponseFile};

@@ -1,10 +1,13 @@
 # Rust JV LLM API example
 
-Async reusable `jv_ai_client` library and separate `jv-api-example` CLI. Uses
-the same public API as [the Python client](../python/jv_api_example.py):
-username/password login, bearer authentication, multipart jobs, polling,
-conversation follow-ups, authenticated response-file downloads, and logout.
-Server-side account assignments control provider/model selection.
+Async reusable `jv_ai_client` library with two CLIs:
+
+- `jv-responses-example` uses the structured asynchronous `/v1/responses`
+  pilot for text and client-executed tool rounds;
+- `jv-api-example` preserves multipart `/v1/jobs`, polling, conversation
+  follow-ups, authenticated response-file downloads, and logout.
+
+Server-side account assignments control provider/model selection for both.
 
 ## Install and build
 
@@ -19,10 +22,34 @@ cargo build --manifest-path rust/Cargo.toml --release
 ```
 
 `Cargo.lock` is committed. Use `--locked` in automation for reproducible
-resolution. The binary is `rust/target/release/jv-api-example` (with `.exe` on
-Windows). `cargo run` also works as shown below.
+resolution. The binaries are `rust/target/release/jv-api-example` and
+`rust/target/release/jv-responses-example` (with `.exe` on Windows).
 
-## Login and ask a question
+## Structured Responses API
+
+```bash
+cargo run --manifest-path rust/Cargo.toml --bin jv-responses-example -- \
+  "Explain recursion in simple terms"
+
+cargo run --manifest-path rust/Cargo.toml --bin jv-responses-example -- \
+  "Use the tool and report this client's platform" --tool-demo
+```
+
+The first command creates idempotent structured work, polls it, and validates
+one completed assistant text item. The tool example declares one strict
+`get_client_platform` function, checks the completed call and JSON arguments,
+runs it locally, then submits a matching `function_call_output` for the final
+inference round. JV Server never executes the local function. See the shared
+[Responses API guide](../docs/responses-api.md).
+
+The reusable library exposes `ResponseRequest`, `FunctionTool`, `ToolChoice`,
+`AgentResponse`, `submit_response`, `get_response`, and `wait_for_response`.
+Callers provide and retain each idempotency key. `AgentResponse::output_text`
+and `function_call` fail closed when terminal output has the wrong type.
+
+## Legacy jobs CLI
+
+### Login and ask a question
 
 ```bash
 cargo run --manifest-path rust/Cargo.toml -- \
@@ -38,6 +65,14 @@ The login body is exactly `username`, `password`, and `remember_me: false`.
 Authenticated requests send `Authorization: Bearer <token>`. All requests
 include `X-JV-CSRF: 1`. Tokens remain in memory, are not returned by `login()`,
 and are never printed. The client uses no persistent cookie/session store.
+
+For the `code` account, pass `--username code` on every invocation (including
+follow-ups), or set `JV_API_USERNAME=code`. Enter its password at the hidden
+prompt. Each job belongs to the account that issued its bearer token; do not
+share one authenticated `JvClient` across users. Create and log in a separate
+client for each account. The server's personal history is owner-only, even for
+administrators; their explicit all-user inspection is separate. Canonical
+server logs for this account are stored under `logs/code/`.
 
 ## File uploads
 
@@ -167,6 +202,18 @@ jv-api-example QUESTION [OPTIONS]
 --wait-timeout SECONDS      Total local polling deadline (default 3600)
 --json                     One terminal-result JSON object on stdout
 --download-dir DIRECTORY    Download generated response files
+```
+
+Structured CLI options:
+
+```text
+jv-responses-example QUESTION [OPTIONS]
+--base-url URL              API origin
+--username USERNAME         Account username
+--poll-interval SECONDS     Positive seconds between polls (default 3)
+--wait-timeout SECONDS      Total local polling deadline (default 3600)
+--tool-demo                 Run one harmless client-side tool round
+--json                      Complete structured response JSON on stdout
 ```
 
 ## Reuse the library

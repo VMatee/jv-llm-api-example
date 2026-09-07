@@ -1,8 +1,9 @@
 # JV LLM API Python guide
 
-The Python 3.10 client is the fullest reference implementation. It supports
-prompts, multiple attachments, conversation follow-ups, polling, complete JSON
-output, and verified response-file downloads.
+Python includes two clients. `jv_responses_example.py` is the structured
+text/agent example. `jv_api_example.py` preserves the full `/v1/jobs` workflow
+for attachments, legacy conversation follow-ups, and verified response-file
+downloads.
 
 Provider, model, and reasoning controls are intentionally absent. The server
 uses the authenticated user's administrator-managed assignment.
@@ -32,7 +33,39 @@ python -m venv .venv
 python -m pip install -r python/requirements.txt
 ```
 
-## Example 1: without an attachment
+## Structured Responses API
+
+Use the new asynchronous structured path for text requests:
+
+```bash
+python ./python/jv_responses_example.py "Explain recursion in simple terms."
+python ./python/jv_responses_example.py "Return a short status." --json
+```
+
+The client creates `/v1/responses` work with a unique idempotency key, polls
+the opaque response ID, and accepts only one validated completed text item.
+Long inference remains asynchronous.
+
+Run the safe two-round tool example with:
+
+```bash
+python ./python/jv_responses_example.py \
+  "Use the tool and tell me which platform this client runs on." \
+  --tool-demo
+```
+
+`get_client_platform` is checked and executed in this Python process. JV Server
+only requests the tool and receives the structured result. See the shared
+[Responses API guide](../docs/responses-api.md) before adding real tools.
+
+The Python API is importable as `JVResponsesClient`; `_base_request`,
+`_tool_request`, and `_continuation` show the exact pilot payloads. Production
+applications should define public request types and persist processed call IDs
+rather than importing underscore-prefixed example helpers.
+
+## Legacy jobs, files, and conversations
+
+### Example 1: without an attachment
 
 Put the question first and do not add `--file`:
 
@@ -51,7 +84,7 @@ python ./python/jv_api_example.py \
 The password prompt does not display the password. The client sends only the
 question as the job input.
 
-## Example 2: with an attachment
+### Example 2: with an attachment
 
 Add `--file` followed by the file path. This copy-paste example uses the safe
 sample document included in the repository:
@@ -72,7 +105,7 @@ python ./python/jv_api_example.py \
   --file ./report-two.pdf
 ```
 
-## Continue a conversation
+### Continue a conversation
 
 Use the conversation ID printed by a completed request:
 
@@ -86,7 +119,7 @@ Send only the new question and new files. The service supplies successful
 earlier context. Do not submit a follow-up while the previous turn remains
 unfinished.
 
-## Download generated files
+### Download generated files
 
 ```bash
 python ./python/jv_api_example.py \
@@ -97,13 +130,13 @@ python ./python/jv_api_example.py \
 The client validates the authenticated response-file manifest, byte count, and
 safe local filename before completing a download.
 
-## Complete JSON
+### Complete JSON
 
 ```bash
 python ./python/jv_api_example.py "Return a short status." --json
 ```
 
-## Use from Python
+### Use from Python
 
 ```python
 import getpass
@@ -161,3 +194,16 @@ python ./python/jv_api_example.py QUESTION [options]
 Polling is safe to repeat. A local timeout does not cancel the server job.
 Never automatically repeat an uncertain submission because the first POST may
 already have been accepted.
+
+Structured-client options are:
+
+```text
+python ./python/jv_responses_example.py QUESTION [options]
+
+--tool-demo                 Run one harmless client-side tool round
+--base-url URL              Override the API origin
+--username USERNAME         Override the default username
+--poll-interval SECONDS     Time between status checks; default: 3
+--wait-timeout SECONDS      Local polling timeout; default: 3600
+--json                      Print the complete structured response JSON
+```

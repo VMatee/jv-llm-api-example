@@ -78,7 +78,9 @@ cmake -S cpp -B cpp/build -A x64 `
 cmake --build cpp/build --config Release
 ```
 
-The executable is `.\cpp\build\Release\jv_api_example.exe`.
+The structured executable is
+`.\cpp\build\Release\jv_responses_example.exe`; the legacy jobs executable is
+`.\cpp\build\Release\jv_api_example.exe`.
 
 ## 6. Build C
 
@@ -88,33 +90,35 @@ cmake -S c -B c/build -A x64 `
 cmake --build c/build --config Release
 ```
 
-The executable is `.\c\build\Release\jv_api_example.exe`.
+The structured executable is `.\c\build\Release\jv_responses_example.exe`;
+the legacy jobs executable is `.\c\build\Release\jv_api_example.exe`.
 
 ## 7. Text-only requests
 
-Do not add `--file` when the request has no attachment.
+These commands use the structured asynchronous `/v1/responses` examples.
 
 Python:
 
 ```powershell
-python .\python\jv_api_example.py "Explain recursion in simple terms."
+python .\python\jv_responses_example.py "Explain recursion in simple terms."
 ```
 
 C++:
 
 ```powershell
-.\cpp\build\Release\jv_api_example.exe "Explain recursion in simple terms."
+.\cpp\build\Release\jv_responses_example.exe "Explain recursion in simple terms."
 ```
 
 C:
 
 ```powershell
-.\c\build\Release\jv_api_example.exe "Explain recursion in simple terms."
+.\c\build\Release\jv_responses_example.exe "Explain recursion in simple terms."
 ```
 
 ## 8. Requests with an attachment
 
-The repository includes a safe sample document. Add `--file` and its path:
+The current Responses pilot is text-only. Attachments use the retained
+`/v1/jobs` examples. The repository includes a safe sample document:
 
 Python:
 
@@ -155,7 +159,7 @@ python .\python\jv_api_example.py `
 The username defaults to `test`. Select another user with `--username`:
 
 ```powershell
-python .\python\jv_api_example.py "Return a short status." --username your-username
+python .\python\jv_responses_example.py "Return a short status." --username your-username
 ```
 
 The client asks for the password without displaying it. For approved

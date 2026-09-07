@@ -4,7 +4,10 @@ use axum::{
     extract::{Request, State},
     http::{HeaderMap, Response, StatusCode},
 };
-use jv_ai_client::{ClientConfig, Error, Job, JobStatus, JvClient, JvJobRequest};
+use jv_ai_client::{
+    ClientConfig, Error, Job, JobStatus, JvClient, JvJobRequest, ResponseOutput, ResponseRequest,
+    ResponseStatus,
+};
 use serde_json::{Value, json};
 use std::{
     collections::VecDeque,
@@ -123,6 +126,86 @@ fn artifact_job(size: u64, name: &str) -> Job {
     value["response"]["files"] =
         json!([{"name":name,"size_bytes":size,"url":"/v1/jobs/job-1/response-files/response-1"}]);
     serde_json::from_value(value).unwrap()
+}
+
+fn agent_response(id: &str, status: &str, output: Value) -> Value {
+    json!({
+        "id": id,
+        "object": "response",
+        "status": status,
+        "output": output,
+        "error": null
+    })
+}
+
+#[tokio::test]
+async fn structured_response_submission_poll_and_tool_continuation() {
+    let first_call = agent_response(
+        "response-1",
+        "completed",
+        json!([{
+            "type": "function_call",
+            "id": "fc-1",
+            "call_id": "call-1",
+            "status": "completed",
+            "name": "get_client_platform",
+            "arguments": "{}"
+        }]),
+    );
+    let final_message = agent_response(
+        "response-2",
+        "completed",
+        json!([{
+            "type": "message",
+            "id": "msg-1",
+            "status": "completed",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": "Client is Linux.", "annotations": []}]
+        }]),
+    );
+    let mock = Mock::start(vec![
+        login(),
+        Reply::json(202, agent_response("response-1", "queued", json!([]))),
+        Reply::json(200, first_call),
+        Reply::json(202, agent_response("response-2", "queued", json!([]))),
+        Reply::json(200, final_message),
+        logout(),
+    ])
+    .await;
+    let mut client = mock.client();
+    client.login("u", "p").await.unwrap();
+    let first = client
+        .submit_response(&ResponseRequest::text("Use the tool"), "round-1")
+        .await
+        .unwrap();
+    let completed = client.wait_for_response(&first.id).await.unwrap();
+    let (call_id, name, arguments) = completed.function_call().unwrap();
+    assert_eq!((name, arguments), ("get_client_platform", "{}"));
+    let next_request = ResponseRequest::continuation(&first.id, call_id, "linux");
+    let next = client
+        .submit_response(&next_request, "round-2")
+        .await
+        .unwrap();
+    let final_response = client.wait_for_response(&next.id).await.unwrap();
+    assert_eq!(final_response.status, ResponseStatus::Completed);
+    assert_eq!(final_response.output_text().unwrap(), "Client is Linux.");
+    assert!(matches!(
+        final_response.output[0],
+        ResponseOutput::Message { .. }
+    ));
+    client.logout().await.unwrap();
+    mock.complete();
+
+    let requests = mock.state.requests.lock().unwrap();
+    assert_eq!(requests[1].path, "/v1/responses");
+    assert_eq!(requests[1].headers["idempotency-key"], "round-1");
+    assert_eq!(requests[2].path, "/v1/responses/response-1");
+    assert_eq!(requests[3].headers["idempotency-key"], "round-2");
+    let continuation: Value = serde_json::from_slice(&requests[3].body).unwrap();
+    assert_eq!(continuation["previous_response_id"], "response-1");
+    assert_eq!(continuation["input"][0]["type"], "function_call_output");
+    assert_eq!(continuation["input"][0]["call_id"], "call-1");
+    assert_eq!(continuation["input"][0]["output"], "linux");
 }
 
 #[tokio::test]

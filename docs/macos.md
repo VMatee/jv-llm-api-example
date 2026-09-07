@@ -54,7 +54,8 @@ cmake --build cpp/build --parallel
 unset JV_CPP_PREFIX
 ```
 
-The executable is `./cpp/build/jv_api_example`.
+The structured executable is `./cpp/build/jv_responses_example`; the legacy
+jobs executable is `./cpp/build/jv_api_example`.
 
 ## 5. Build C
 
@@ -67,33 +68,35 @@ cmake --build c/build --parallel
 unset JV_C_PREFIX
 ```
 
-The executable is `./c/build/jv_api_example`.
+The structured executable is `./c/build/jv_responses_example`; the legacy jobs
+executable is `./c/build/jv_api_example`.
 
 ## 6. Text-only requests
 
-Do not add `--file` when the request has no attachment.
+These commands use the structured asynchronous `/v1/responses` examples.
 
 Python:
 
 ```bash
-python ./python/jv_api_example.py "Explain recursion in simple terms."
+python ./python/jv_responses_example.py "Explain recursion in simple terms."
 ```
 
 C++:
 
 ```bash
-./cpp/build/jv_api_example "Explain recursion in simple terms."
+./cpp/build/jv_responses_example "Explain recursion in simple terms."
 ```
 
 C:
 
 ```bash
-./c/build/jv_api_example "Explain recursion in simple terms."
+./c/build/jv_responses_example "Explain recursion in simple terms."
 ```
 
 ## 7. Requests with an attachment
 
-The repository includes a safe sample document. Add `--file` and its path:
+The current Responses pilot is text-only. Attachments use the retained
+`/v1/jobs` examples. The repository includes a safe sample document:
 
 Python:
 
@@ -133,7 +136,7 @@ python ./python/jv_api_example.py \
 The username defaults to `test`. Select another user with `--username`:
 
 ```bash
-python ./python/jv_api_example.py "Return a short status." --username your-username
+python ./python/jv_responses_example.py "Return a short status." --username your-username
 ```
 
 The client asks for the password without displaying it. For approved

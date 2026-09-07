@@ -25,9 +25,20 @@ pub enum Error {
     )]
     SubmissionUncertain { status: Option<u16> },
     #[error(
+        "Responses submission outcome is uncertain (HTTP {status:?}); reuse idempotency key {idempotency_key} after reconciling account state"
+    )]
+    ResponseSubmissionUncertain {
+        status: Option<u16>,
+        idempotency_key: String,
+    },
+    #[error(
         "Local wait timed out for job {job_id}; the server job was not cancelled. Resume polling this ID"
     )]
     WaitTimeout { job_id: String },
+    #[error(
+        "Local wait timed out for response {response_id}; the server response was not cancelled. Resume polling this ID"
+    )]
+    ResponseWaitTimeout { response_id: String },
     #[error("Local file operation failed")]
     FileIo,
     #[error("Unsafe response download: {0}")]
