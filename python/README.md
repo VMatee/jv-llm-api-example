@@ -63,6 +63,13 @@ The Python API is importable as `JVResponsesClient`; `_base_request`,
 applications should define public request types and persist processed call IDs
 rather than importing underscore-prefixed example helpers.
 
+`_image_tool_continuation` serializes the certified `view_image` content-array
+result. `_custom_tool_request`, `_custom_tool_call`, and `_custom_continuation`
+demonstrate the exact pinned Codex `0.149.1` declaration/call/result shapes.
+They never execute a patch; client applications must validate and execute the
+opaque request under their own sandbox and approval rules. The exact grammar is
+[`examples/codex-0.149.1-apply-patch.lark`](../examples/codex-0.149.1-apply-patch.lark).
+
 ## Legacy jobs, files, and conversations
 
 For structured attachments, use:

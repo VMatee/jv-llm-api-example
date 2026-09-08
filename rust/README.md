@@ -47,6 +47,13 @@ The reusable library exposes `ResponseRequest`, `FunctionTool`, `ToolChoice`,
 Callers provide and retain each idempotency key. `AgentResponse::output_text`
 and `function_call` fail closed when terminal output has the wrong type.
 
+`ResponseRequest::image_tool_continuation` serializes the certified
+image-bearing function result. `CustomTool::codex_0_149_1_apply_patch`,
+`AgentResponse::custom_tool_call`, and
+`ResponseRequest::custom_tool_continuation` cover the exact pinned custom
+declaration/call/result wire forms. They do not parse or execute patches; that
+remains the client's sandboxed, approval-controlled responsibility.
+
 Structured mixed inputs:
 
 ```bash

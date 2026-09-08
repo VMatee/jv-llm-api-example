@@ -42,6 +42,12 @@ pub enum ResponseOutput {
         name: String,
         arguments: String,
     },
+    CustomToolCall {
+        id: String,
+        call_id: String,
+        name: String,
+        input: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -113,6 +119,59 @@ impl AgentResponse {
             _ => Err(Error::MalformedResponse),
         }
     }
+
+    pub fn custom_tool_call(&self) -> Result<(&str, &str)> {
+        if self.status != ResponseStatus::Completed || self.output.len() != 1 {
+            return Err(Error::MalformedResponse);
+        }
+        match &self.output[0] {
+            ResponseOutput::CustomToolCall {
+                id,
+                call_id,
+                name,
+                input,
+                ..
+            } if name == "apply_patch" && !input.is_empty() && input.len() <= 32 * 1024 => {
+                validate_id(id).map_err(|_| Error::MalformedResponse)?;
+                validate_id(call_id).map_err(|_| Error::MalformedResponse)?;
+                Ok((call_id, input))
+            }
+            _ => Err(Error::MalformedResponse),
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum FunctionOutputContent {
+    InputImage { image_url: String, detail: String },
+}
+
+// Image data URLs must not appear through accidental debug logging.
+impl std::fmt::Debug for FunctionOutputContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("InputImage([redacted])")
+    }
+}
+
+impl TryFrom<crate::InputContent> for FunctionOutputContent {
+    type Error = Error;
+
+    fn try_from(value: crate::InputContent) -> Result<Self> {
+        match value {
+            crate::InputContent::InputImage { image_url, detail } => {
+                Ok(Self::InputImage { image_url, detail })
+            }
+            _ => Err(Error::InvalidInput("tool result requires input_image")),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(untagged)]
+pub enum FunctionCallOutputValue {
+    Text(String),
+    Content(Vec<FunctionOutputContent>),
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -129,6 +188,11 @@ pub enum ResponseInput {
     FunctionCallOutput {
         r#type: String,
         call_id: String,
+        output: FunctionCallOutputValue,
+    },
+    CustomToolCallOutput {
+        r#type: String,
+        call_id: String,
         output: String,
     },
 }
@@ -140,6 +204,58 @@ pub struct FunctionTool {
     pub description: String,
     pub strict: bool,
     pub parameters: Value,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct CustomToolFormat {
+    pub r#type: String,
+    pub syntax: String,
+    pub definition: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct CustomTool {
+    pub r#type: String,
+    pub name: String,
+    pub description: String,
+    pub format: CustomToolFormat,
+}
+
+pub const CODEX_APPLY_PATCH_LARK: &str =
+    include_str!("../../examples/codex-0.149.1-apply-patch.lark");
+
+impl CustomTool {
+    pub fn codex_0_149_1_apply_patch() -> Self {
+        Self {
+            r#type: "custom".into(),
+            name: "apply_patch".into(),
+            description: "The `apply_patch` tool can be used to edit files. This is a FREEFORM tool, so do not wrap the patch in JSON.".into(),
+            format: CustomToolFormat {
+                r#type: "grammar".into(),
+                syntax: "lark".into(),
+                definition: CODEX_APPLY_PATCH_LARK.into(),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(untagged)]
+pub enum ResponseTool {
+    Function(FunctionTool),
+    Custom(CustomTool),
+}
+
+impl From<FunctionTool> for ResponseTool {
+    fn from(value: FunctionTool) -> Self {
+        Self::Function(value)
+    }
+}
+
+impl From<CustomTool> for ResponseTool {
+    fn from(value: CustomTool) -> Self {
+        Self::Custom(value)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -159,7 +275,7 @@ pub struct ResponseRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     pub input: Vec<ResponseInput>,
-    pub tools: Vec<FunctionTool>,
+    pub tools: Vec<ResponseTool>,
     pub tool_choice: ToolChoice,
     pub parallel_tool_calls: bool,
     pub store: bool,
@@ -200,6 +316,43 @@ impl ResponseRequest {
             input: vec![ResponseInput::FunctionCallOutput {
                 r#type: "function_call_output".into(),
                 call_id: call_id.into(),
+                output: FunctionCallOutputValue::Text(output.into()),
+            }],
+            tools: vec![],
+            tool_choice: ToolChoice::None,
+            parallel_tool_calls: false,
+            store: true,
+            stream: false,
+        }
+    }
+
+    pub fn image_tool_continuation(
+        previous_response_id: impl Into<String>,
+        call_id: impl Into<String>,
+        images: Vec<FunctionOutputContent>,
+    ) -> Self {
+        let mut request = Self::continuation(previous_response_id, call_id, "");
+        if let ResponseInput::FunctionCallOutput { output, .. } = &mut request.input[0] {
+            *output = FunctionCallOutputValue::Content(images);
+        }
+        request
+    }
+
+    pub fn custom_tool_continuation(
+        previous_response_id: impl Into<String>,
+        call_id: impl Into<String>,
+        output: impl Into<String>,
+    ) -> Self {
+        Self {
+            model: "jv-ai".into(),
+            background: true,
+            previous_response_id: Some(previous_response_id.into()),
+            instructions: Some(
+                "Use the client tool result and answer the original request.".into(),
+            ),
+            input: vec![ResponseInput::CustomToolCallOutput {
+                r#type: "custom_tool_call_output".into(),
+                call_id: call_id.into(),
                 output: output.into(),
             }],
             tools: vec![],
@@ -221,6 +374,63 @@ impl ResponseRequest {
         }
         if self.input.is_empty() || self.input.len() > 16 || self.tools.len() > 16 {
             return Err(Error::InvalidInput("invalid Responses input or tool count"));
+        }
+        for input in &self.input {
+            match input {
+                ResponseInput::FunctionCallOutput {
+                    output: FunctionCallOutputValue::Content(images),
+                    ..
+                } if images.is_empty() || images.len() > 4 => {
+                    return Err(Error::InvalidInput("invalid tool-result image count"));
+                }
+                ResponseInput::FunctionCallOutput {
+                    call_id,
+                    output: FunctionCallOutputValue::Content(images),
+                    ..
+                } => {
+                    validate_id(call_id)?;
+                    for image in images {
+                        match image {
+                            FunctionOutputContent::InputImage { image_url, detail }
+                                if matches!(detail.as_str(), "auto" | "high")
+                                    && image_url.len() <= 6_990_508 + 32
+                                    && [
+                                        "data:image/png;base64,",
+                                        "data:image/jpeg;base64,",
+                                        "data:image/webp;base64,",
+                                    ]
+                                    .iter()
+                                    .any(|prefix| image_url.starts_with(prefix)) => {}
+                            _ => {
+                                return Err(Error::InvalidInput("unsupported tool-result image"));
+                            }
+                        }
+                    }
+                }
+                ResponseInput::FunctionCallOutput { call_id, .. } => {
+                    validate_id(call_id)?;
+                }
+                ResponseInput::CustomToolCallOutput {
+                    call_id, output, ..
+                } => {
+                    validate_id(call_id)?;
+                    if output.len() > 32 * 1024 {
+                        return Err(Error::InvalidInput("custom tool result too large"));
+                    }
+                }
+                _ => {}
+            }
+        }
+        for tool in &self.tools {
+            if let ResponseTool::Custom(custom) = tool
+                && (custom.r#type != "custom"
+                    || custom.name != "apply_patch"
+                    || custom.format.r#type != "grammar"
+                    || custom.format.syntax != "lark"
+                    || custom.format.definition != CODEX_APPLY_PATCH_LARK)
+            {
+                return Err(Error::InvalidInput("unsupported custom tool"));
+            }
         }
         if let Some(id) = &self.previous_response_id {
             validate_id(id)?;

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import hashlib
 import json
 import os
 import platform
@@ -40,6 +41,10 @@ except ImportError:  # Direct script execution adds python/ instead of its paren
 
 TERMINAL_RESPONSE_STATUSES = frozenset({"completed", "failed"})
 CLIENT_TOOL_NAME = "get_client_platform"
+CUSTOM_TOOL_NAME = "apply_patch"
+CODEX_APPLY_PATCH_LARK_SHA256 = (
+    "d6367f4826ed608c424b0a308f3d6163527df63c22513d089b91863552f8bfeb"
+)
 
 
 def _idempotency_key() -> str:
@@ -125,6 +130,31 @@ def _tool_call(payload: dict[str, Any]) -> tuple[str, str]:
     if arguments != {}:
         raise JVAPIError("The platform tool accepts no arguments.")
     return call_id, platform.system() or "Unknown"
+
+
+def _custom_tool_call(payload: dict[str, Any]) -> tuple[str, str]:
+    """Return an opaque client-side apply_patch request without executing it."""
+    _validate_response(payload)
+    if payload.get("status") != "completed":
+        raise JVAPIError("The custom-tool response did not complete.")
+    item = payload["output"][0]
+    if (
+        not isinstance(item, dict)
+        or set(item) != {"type", "id", "call_id", "name", "input"}
+        or item.get("type") != "custom_tool_call"
+        or item.get("name") != CUSTOM_TOOL_NAME
+    ):
+        raise JVAPIError("Expected one certified apply_patch custom tool call.")
+    _require_id(item.get("id"), "custom tool item ID")
+    call_id = _require_id(item.get("call_id"), "custom tool call ID")
+    freeform = item.get("input")
+    if (
+        not isinstance(freeform, str)
+        or not freeform
+        or len(freeform.encode("utf-8")) > 32 * 1024
+    ):
+        raise JVAPIError("The custom tool input is invalid or oversized.")
+    return call_id, freeform
 
 
 class JVResponsesClient:
@@ -314,6 +344,8 @@ def _tool_request(question: str) -> dict[str, Any]:
 
 
 def _continuation(previous_id: str, call_id: str, result: str) -> dict[str, Any]:
+    _require_id(previous_id, "previous response ID")
+    _require_id(call_id, "tool call ID")
     return {
         "model": "jv-ai",
         "background": True,
@@ -328,6 +360,69 @@ def _continuation(previous_id: str, call_id: str, result: str) -> dict[str, Any]
         "store": True,
         "stream": False,
     }
+
+
+def _image_tool_continuation(
+    previous_id: str, call_id: str, image: dict[str, Any]
+) -> dict[str, Any]:
+    """Serialize the certified image-bearing function result subset."""
+    if (
+        not isinstance(image, dict)
+        or set(image) != {"type", "image_url", "detail"}
+        or image.get("type") != "input_image"
+        or image.get("detail") not in {"auto", "high"}
+        or not isinstance(image.get("image_url"), str)
+        or not image["image_url"].startswith(
+            ("data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,")
+        )
+    ):
+        raise JVAPIError("Expected one supported input_image tool-result part.")
+    body = _continuation(previous_id, call_id, "")
+    body["input"][0]["output"] = [dict(image)]
+    return body
+
+
+def _custom_tool_request(question: str, grammar: str) -> dict[str, Any]:
+    """Declare only the exact custom tool certified for pinned Codex 0.149.1."""
+    if (
+        not isinstance(grammar, str)
+        or hashlib.sha256(grammar.encode()).hexdigest()
+        != CODEX_APPLY_PATCH_LARK_SHA256
+    ):
+        raise JVAPIError("The apply_patch grammar is not the certified definition.")
+    body = _base_request(question)
+    body["tools"] = [
+        {
+            "type": "custom",
+            "name": CUSTOM_TOOL_NAME,
+            "description": (
+                "The `apply_patch` tool can be used to edit files. This is a "
+                "FREEFORM tool, so do not wrap the patch in JSON."
+            ),
+            "format": {
+                "type": "grammar",
+                "syntax": "lark",
+                "definition": grammar,
+            },
+        }
+    ]
+    body["tool_choice"] = "required"
+    return body
+
+
+def _custom_continuation(
+    previous_id: str, call_id: str, result: str
+) -> dict[str, Any]:
+    """Serialize a client-produced result; this function never applies a patch."""
+    if not isinstance(result, str) or len(result.encode("utf-8")) > 32 * 1024:
+        raise JVAPIError("The custom tool result is invalid or oversized.")
+    body = _continuation(previous_id, call_id, "")
+    body["input"][0] = {
+        "type": "custom_tool_call_output",
+        "call_id": call_id,
+        "output": result,
+    }
+    return body
 
 
 class AttachmentAction(argparse.Action):

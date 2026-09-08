@@ -208,6 +208,60 @@ async fn structured_response_submission_poll_and_tool_continuation() {
     assert_eq!(continuation["input"][0]["output"], "linux");
 }
 
+#[test]
+fn pinned_codex_image_result_and_custom_tool_shapes() {
+    use jv_ai_client::{
+        CODEX_APPLY_PATCH_LARK, CustomTool, FunctionOutputContent, ResponseRequest, ResponseTool,
+        local_image,
+    };
+
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("view.png");
+    image::RgbImage::from_pixel(4, 4, image::Rgb([0, 0, 255]))
+        .save(&path)
+        .unwrap();
+    let image = FunctionOutputContent::try_from(local_image(&path, "high").unwrap()).unwrap();
+    let image_request =
+        ResponseRequest::image_tool_continuation("response-1", "call-image", vec![image]);
+    let image_json = serde_json::to_value(&image_request).unwrap();
+    assert_eq!(image_json["input"][0]["type"], "function_call_output");
+    assert_eq!(image_json["input"][0]["call_id"], "call-image");
+    assert_eq!(image_json["input"][0]["output"][0]["type"], "input_image");
+    assert_eq!(image_json["input"][0]["output"][0]["detail"], "high");
+
+    let custom = CustomTool::codex_0_149_1_apply_patch();
+    assert_eq!(custom.format.definition, CODEX_APPLY_PATCH_LARK);
+    let mut declaration = ResponseRequest::text("Edit the disposable fixture");
+    declaration.tools = vec![ResponseTool::Custom(custom)];
+    declaration.tool_choice = jv_ai_client::ToolChoice::Required;
+    let declaration_json = serde_json::to_value(&declaration).unwrap();
+    assert_eq!(declaration_json["tools"][0]["type"], "custom");
+    assert_eq!(declaration_json["tools"][0]["name"], "apply_patch");
+    assert_eq!(declaration_json["tools"][0]["format"]["type"], "grammar");
+    assert_eq!(declaration_json["tools"][0]["format"]["syntax"], "lark");
+
+    let freeform = "*** Begin Patch\n*** Add File: example.txt\n+example\n*** End Patch";
+    let call: jv_ai_client::AgentResponse = serde_json::from_value(agent_response(
+        "response-2",
+        "completed",
+        json!([{"type":"custom_tool_call","id":"ctc-1","call_id":"call-custom","name":"apply_patch","input":freeform}]),
+    ))
+    .unwrap();
+    assert_eq!(call.custom_tool_call().unwrap(), ("call-custom", freeform));
+    let result = ResponseRequest::custom_tool_continuation(
+        "response-2",
+        "call-custom",
+        "Success. Updated example.txt",
+    );
+    let result_json = serde_json::to_value(result).unwrap();
+    assert_eq!(result_json["input"][0]["type"], "custom_tool_call_output");
+    assert_eq!(result_json["input"][0]["call_id"], "call-custom");
+    assert_eq!(
+        result_json["input"][0]["output"],
+        "Success. Updated example.txt"
+    );
+}
+
 #[tokio::test]
 async fn staged_file_mixed_content_and_continuation_http() {
     use jv_ai_client::{InputContent, ResponseInput, local_image};

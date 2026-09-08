@@ -110,14 +110,145 @@ Continue with a new idempotency key and the exact published `call_id`:
 Instructions and tool definitions are not inherited. Resend them when another
 tool round is allowed. Tool results are untrusted input to inference.
 
+### Image-bearing function results (`view_image`)
+
+The string-valued `function_call_output` above remains supported unchanged.
+Pinned Codex `0.149.1` can also return an image from its client-side
+`view_image` function as this exact structured subset:
+
+```json
+{
+  "model": "jv-ai",
+  "background": true,
+  "previous_response_id": "response_that_published_the_call",
+  "input": [{
+    "type": "function_call_output",
+    "call_id": "call_opaque",
+    "output": [{
+      "type": "input_image",
+      "image_url": "data:image/png;base64,<actual bytes>",
+      "detail": "high"
+    }]
+  }],
+  "tools": [],
+  "tool_choice": "none",
+  "parallel_tool_calls": false,
+  "store": true,
+  "stream": false
+}
+```
+
+The result must be the only input item and must use the exact `call_id` from
+the latest completed, owned response selected by `previous_response_id`.
+Arrays contain 1–4 `input_image` items only. PNG, JPEG, and WebP data URLs are
+accepted with `detail:"auto"` or `"high"`; omitted detail becomes `auto`.
+Text, files, audio, encrypted content, remote URLs, local/server paths, unknown
+items, and mixed unsupported arrays are rejected. This does not certify
+arbitrary Responses content arrays.
+
+Images use the same validation and private attachment lifecycle as ordinary
+`input_image`: strict canonical base64, MIME/container agreement, complete
+single-frame decode, at most 8192 pixels per axis and 16 million pixels, 5 MiB
+per decoded image, 12 MiB image total, and four images across current and
+replayed context. The complete image-bearing request is capped at 17 MiB;
+normalized structured metadata remains capped at 64 KiB. The general combined
+attachment limits below also apply.
+
+`view_image` executes on the client under its filesystem sandbox. JV Server
+receives only its result, preserves the image's role and call association, and
+sends the exact validated image bytes through the existing provider attachment
+abstraction. It does not read the client path, execute `view_image`, OCR the
+image, replace it with text, or log raw base64. Canonical protocol data stores
+safe MIME, size, digest, and private artifact identity metadata.
+
+An exact retry uses the same owner-scoped idempotency key, body, call ID, and
+image bytes and returns the existing response. Changed bytes or any changed
+logical body with the same key returns a conflict. A new continuation requires
+a new key.
+
+### Certified custom/freeform tool (`apply_patch`)
+
+The only certified custom tool is the pinned Codex `0.149.1` `apply_patch`
+declaration. Its grammar is retained verbatim in
+[`examples/codex-0.149.1-apply-patch.lark`](../examples/codex-0.149.1-apply-patch.lark),
+whose SHA-256 is
+`d6367f4826ed608c424b0a308f3d6163527df63c22513d089b91863552f8bfeb`:
+
+```json
+{
+  "type": "custom",
+  "name": "apply_patch",
+  "description": "The `apply_patch` tool can be used to edit files. This is a FREEFORM tool, so do not wrap the patch in JSON.",
+  "format": {
+    "type": "grammar",
+    "syntax": "lark",
+    "definition": "start: begin_patch hunk+ end_patch\nbegin_patch: \"*** Begin Patch\" LF\nend_patch: \"*** End Patch\" LF?\n\nhunk: add_hunk | delete_hunk | update_hunk\nadd_hunk: \"*** Add File: \" filename LF add_line+\ndelete_hunk: \"*** Delete File: \" filename LF\nupdate_hunk: \"*** Update File: \" filename LF change_move? change?\n\nfilename: /(.+)/\nadd_line: \"+\" /(.*)/ LF -> line\n\nchange_move: \"*** Move to: \" filename LF\nchange: (change_context | change_line)+ eof_line?\nchange_context: (\"@@\" | \"@@ \" /(.+)/) LF\nchange_line: (\"+\" | \"-\" | \" \") /(.*)/ LF\neof_line: \"*** End of File\" LF\n\n%import common.LF\n"
+  }
+}
+```
+
+The linked grammar bytes are the `definition` string; line endings and final
+newline are significant. JV rejects another grammar digest, syntax, format,
+unknown custom-tool fields or undeclared name. JSON function tools and this
+custom tool share the existing limit of 16 unique declarations. This narrowly
+certifies the captured `apply_patch` form and does not advertise general custom
+tool compatibility.
+
+After provider inference, a validated call is published as:
+
+```json
+{
+  "type": "custom_tool_call",
+  "id": "ctc_opaque",
+  "call_id": "call_opaque",
+  "name": "apply_patch",
+  "input": "*** Begin Patch\n*** Add File: example.txt\n+example\n*** End Patch"
+}
+```
+
+The client must preserve the opaque `call_id` and freeform `input` exactly,
+then validate the patch and apply its own sandbox and approval policy. The
+freeform input is data, not JSON arguments. It is nonempty UTF-8 and capped at
+32 KiB. **JV Server never executes `apply_patch`, parses source files, or
+applies a patch.**
+
+After client execution, submit the corresponding result as the sole input with
+a new key and the exact latest predecessor:
+
+```json
+{
+  "model": "jv-ai",
+  "background": true,
+  "previous_response_id": "response_that_published_the_custom_call",
+  "input": [{
+    "type": "custom_tool_call_output",
+    "call_id": "call_opaque",
+    "output": "Success. Updated the following files:\nA example.txt"
+  }],
+  "tools": [],
+  "tool_choice": "none",
+  "parallel_tool_calls": false,
+  "store": true,
+  "stream": false
+}
+```
+
+The custom result is a UTF-8 string capped at 32 KiB; an array is unsupported.
+Its result type must match the pending custom call class and its exact call ID.
+Owner scope, latest-completed ordering, idempotency, and one nonterminal turn
+remain enforced. Exact same-key replay returns the existing response; changed
+result text, including whitespace, conflicts. Resend declarations and choose
+`auto` or `required` only when another tool call should be permitted.
+
 ## Current boundaries
 
 - `background:true`, `store:true`, `stream:false`, and
   `parallel_tool_calls:false` are required.
 - `model` is the generic `jv-ai`; clients cannot override provider, model, or
   effort.
-- Input supports text, images and staged files. Generated-file downloads and
-  legacy conversation IDs remain on `/v1/jobs`.
+- Input supports text, images, staged files, JSON function tools, the certified
+  image-bearing function result, and the certified custom `apply_patch` flow.
+  Generated-file downloads and legacy conversation IDs remain on `/v1/jobs`.
 - There is no SSE, synchronous wait, cancellation, usage object, hidden
   reasoning, or full SDK compatibility in this pilot.
 - Tool output appears only after terminal provider success and strict server
@@ -181,8 +312,10 @@ arbitrary archives/executables, SVG, audio/video and macro-enabled Office are
 unsupported. Do not disguise extensions. Remote URLs, file_url, file_data,
 file:// and server paths are unsupported; no remote fetching occurs.
 
-Coding-agent adapters can implement this JV subset; unmodified Codex, streaming,
-hosted tools and MCP are not promised.
+Coding-agent adapters can implement this JV subset. These core wire forms were
+certified against pinned Codex `0.149.1`; complete unmodified Codex compatibility,
+streaming, parallel calls, hosted tools, all custom tools, audio/video and MCP
+are not promised.
 
 ## Idempotency and failure handling
 

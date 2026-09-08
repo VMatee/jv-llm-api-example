@@ -3,10 +3,11 @@
 Maintained reference clients for JV Server's asynchronous `/v1/responses` and
 established `/v1/jobs` APIs. C/C++ examples were retired and remain in Git history.
 
-Structured input supports text, images, staged files, ordered mixed content and
-client-side tool continuation. This is a documented JV subset, **not a drop-in
-OpenAI Responses implementation or guaranteed unmodified Codex compatibility**.
-JV CLI integration remains separate.
+Structured input supports text, images, staged files, ordered mixed content,
+JSON function tools, image-bearing `view_image` result continuation, and the
+custom/freeform `apply_patch` flow certified for pinned Codex `0.149.1`.
+This is a documented JV subset, **not a drop-in OpenAI Responses implementation
+or complete unmodified Codex compatibility**. JV CLI integration remains separate.
 
 ## Start
 
@@ -37,6 +38,11 @@ Repeat attachment options; their order is preserved. Both clients support
 attachment-only input. `--tool-demo` runs only a fixed local platform function;
 the server never executes tools or uploaded source. Tool continuation retains
 the original attachments without requiring the client to resend them.
+
+The Python and Rust libraries also include protocol-only constructors and tests
+for image-bearing function results and pinned `apply_patch` custom calls/results.
+They do not execute patches. See the exact certified shapes and limits in the
+[Responses contract](docs/responses-api.md).
 
 Certified input: PNG/JPEG/WebP; TXT, Markdown, PDF, JSON, CSV, Python source,
 and conservative DOCX/XLSX/PPTX. Server validation, not extensions alone,

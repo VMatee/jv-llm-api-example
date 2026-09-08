@@ -109,7 +109,8 @@ async fn run(args: &Args) -> Result<bool> {
                     "required": [],
                     "additionalProperties": false
                 }),
-            }];
+            }
+            .into()];
             request.tool_choice = ToolChoice::Required;
         }
         let created = client.submit_response(&request, &key).await?;
