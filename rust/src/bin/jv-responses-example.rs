@@ -1,7 +1,7 @@
 use clap::Parser;
 use jv_ai_client::{
-    ClientConfig, DEFAULT_BASE_URL, Error, FunctionTool, JvClient, ResponseRequest, ResponseStatus,
-    Result, ToolChoice,
+    ClientConfig, DEFAULT_BASE_URL, Error, FunctionTool, InputContent, JvClient, ResponseInput,
+    ResponseRequest, ResponseStatus, Result, ToolChoice, local_image,
 };
 use serde_json::json;
 use std::{
@@ -14,7 +14,7 @@ use zeroize::Zeroizing;
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Parser)]
-#[command(about = "Submit one text request through JV's structured Responses API pilot")]
+#[command(about = "Submit text and local attachments through JV's structured Responses API")]
 struct Args {
     question: String,
     #[arg(long, env = "JV_API_BASE_URL", default_value = DEFAULT_BASE_URL, hide_env_values = true)]
@@ -35,6 +35,13 @@ struct Args {
     /// Demonstrate one strictly validated tool call executed by this client
     #[arg(long)]
     tool_demo: bool,
+    /// Ordered local attachments: --attach file:report.pdf --attach image:screen.png
+    #[arg(long)]
+    attach: Vec<String>,
+    #[arg(long, default_value="auto", value_parser=["auto", "high"])]
+    image_detail: String,
+    #[arg(long)]
+    idempotency_key: Option<String>,
 }
 
 fn seconds(value: &str) -> std::result::Result<Duration, String> {
@@ -73,6 +80,20 @@ async fn run(args: &Args) -> Result<bool> {
     eprintln!("Authenticated.");
     let operation: Result<_> = async {
         let mut request = ResponseRequest::text(&args.question);
+        let key = args.idempotency_key.clone().unwrap_or_else(idempotency_key);
+        if key.len()>100 { return Err(Error::InvalidInput("CLI idempotency key must be at most 100 characters")); }
+        eprintln!("Logical request key: {key}");
+        if args.attach.len()>6 || args.attach.iter().filter(|s|s.starts_with("file:")).count()>4 || args.attach.iter().filter(|s|s.starts_with("image:")).count()>4 { return Err(Error::InvalidInput("at most 4 files, 4 images and 6 mixed attachments")); }
+        if !args.attach.is_empty() {
+            let mut content=Vec::new();
+            if !args.question.is_empty() {content.push(InputContent::InputText{text:args.question.clone()});}
+            for (index, attachment) in args.attach.iter().enumerate() {
+                if let Some(path)=attachment.strip_prefix("image:") {content.push(local_image(std::path::Path::new(path),&args.image_detail)?);}
+                else if let Some(path)=attachment.strip_prefix("file:") {let staged=client.stage_file(std::path::Path::new(path),&format!("{key}-upload-{index}")).await?; content.push(InputContent::InputFile{file_id:staged.id});}
+                else {return Err(Error::InvalidInput("use --attach file:PATH or --attach image:PATH"));}
+            }
+            request.input=vec![ResponseInput::ContentMessage{role:"user".into(),content}];
+        }
         if args.tool_demo {
             request.instructions = Some(
                 "Call get_client_platform once. After its result arrives, answer briefly without requesting another tool.".into(),
@@ -91,7 +112,7 @@ async fn run(args: &Args) -> Result<bool> {
             }];
             request.tool_choice = ToolChoice::Required;
         }
-        let created = client.submit_response(&request, &idempotency_key()).await?;
+        let created = client.submit_response(&request, &key).await?;
         eprintln!("Created structured response {}.", created.id);
         let mut terminal = client.wait_for_response(&created.id).await?;
         if args.tool_demo {
@@ -101,7 +122,7 @@ async fn run(args: &Args) -> Result<bool> {
             }
             eprintln!("Executing allowlisted local tool get_client_platform; JV Server does not execute it.");
             let continuation = ResponseRequest::continuation(&created.id, call_id, std::env::consts::OS);
-            let next = client.submit_response(&continuation, &idempotency_key()).await?;
+            let next = client.submit_response(&continuation, &format!("{key}-continuation")).await?;
             eprintln!("Created continuation response {}.", next.id);
             terminal = client.wait_for_response(&next.id).await?;
         }

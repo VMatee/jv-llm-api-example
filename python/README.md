@@ -1,7 +1,7 @@
 # JV LLM API Python guide
 
 Python includes two clients. `jv_responses_example.py` is the structured
-text/agent example. `jv_api_example.py` preserves the full `/v1/jobs` workflow
+text/attachment/agent example. `jv_api_example.py` preserves the full `/v1/jobs` workflow
 for attachments, legacy conversation follow-ups, and verified response-file
 downloads.
 
@@ -64,6 +64,19 @@ applications should define public request types and persist processed call IDs
 rather than importing underscore-prefixed example helpers.
 
 ## Legacy jobs, files, and conversations
+
+For structured attachments, use:
+
+```bash
+python python/jv_responses_example.py "Compare these inputs." --image screenshot.png --file report.pdf
+```
+
+Repeated `--file` and `--image` preserve their order. Add `--tool-demo` to
+exercise attachment-backed continuation. `--image-detail` accepts auto/high.
+`--idempotency-key` lets you retain a stable logical request key.
+Library users can call `stage_file(path, upload_key)` and use its returned ID
+in an `input_file` part; `attachments.image_part` builds bounded data URLs.
+The server independently validates contents and account capability.
 
 ### Example 1: without an attachment
 

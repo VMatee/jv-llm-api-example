@@ -16,6 +16,7 @@ from typing import Any, Callable
 import requests
 
 try:
+    from .attachments import image_part, local_file
     from .jv_api_example import (
         CSRF_HEADER,
         CSRF_VALUE,
@@ -26,6 +27,7 @@ try:
         _validated_base_url,
     )
 except ImportError:  # Direct script execution adds python/ instead of its parent.
+    from attachments import image_part, local_file
     from jv_api_example import (
         CSRF_HEADER,
         CSRF_VALUE,
@@ -141,11 +143,46 @@ class JVResponsesClient:
         )
         self._authenticated = False
 
+    def stage_file(self, path, idempotency_key: str) -> dict[str, Any]:
+        if not self._authenticated:
+            raise JVAPIError("Call login() before staging a file.")
+        name, mime, data = local_file(path)
+        try:
+            response = self.session.post(
+                f"{self.base_url}/v1/files",
+                files={"file": (name, data, mime)},
+                headers={"Idempotency-Key": idempotency_key},
+                timeout=self.timeout,
+                allow_redirects=False,
+            )
+            value = _require_status(response, {200, 201})
+            file_id = value.get("id") if isinstance(value, dict) else None
+            if (
+                not isinstance(file_id, str)
+                or len(file_id) != 48
+                or not file_id.startswith("file_")
+            ):
+                raise JVAPIError("Invalid staged file object")
+            _require_id(file_id, "file ID")
+            if (
+                value.get("object") != "file"
+                or value.get("bytes") != len(data)
+                or value.get("filename") != name
+                or value.get("media_type") != mime
+            ):
+                raise JVAPIError("Invalid staged file metadata")
+            return value
+        except (requests.RequestException, JVAPIError) as exc:
+            raise JVAPIError(
+                f"Staging not confirmed; retain the same upload key {idempotency_key} and exact bytes for reconciliation."
+            ) from exc
+
     def login(self, username: str, password: str) -> None:
         response = self.session.post(
             f"{self.base_url}/v1/auth/login",
             json={"username": username, "password": password, "remember_me": False},
             timeout=self.timeout,
+            allow_redirects=False,
         )
         payload = _require_status(response, {200})
         token = payload.get("access_token") if payload else None
@@ -154,7 +191,9 @@ class JVResponsesClient:
         self.session.headers["Authorization"] = f"Bearer {token}"
         self._authenticated = True
 
-    def create(self, body: dict[str, Any], idempotency_key: str | None = None) -> dict[str, Any]:
+    def create(
+        self, body: dict[str, Any], idempotency_key: str | None = None
+    ) -> dict[str, Any]:
         if not self._authenticated:
             raise JVAPIError("Call login() before creating a response.")
         key = idempotency_key or _idempotency_key()
@@ -164,22 +203,30 @@ class JVResponsesClient:
                 json=body,
                 headers={"Idempotency-Key": key},
                 timeout=self.timeout,
+                allow_redirects=False,
             )
         except requests.RequestException as exc:
             raise JVAPIError(
                 f"Response submission is uncertain. Poll account state before retrying; "
                 f"reuse idempotency key {key}."
             ) from exc
-        payload = _require_status(response, {200, 202})
-        if payload is None:
-            raise JVAPIError("The create response endpoint returned no JSON.")
-        _validate_response(payload)
+        try:
+            payload = _require_status(response, {200, 202})
+            if payload is None:
+                raise JVAPIError("The create response endpoint returned no JSON.")
+            _validate_response(payload)
+        except (JVAPIError, ValueError) as exc:
+            raise JVAPIError(
+                f"Submission not confirmed; retain the exact request and idempotency key {key} for reconciliation."
+            ) from exc
         return payload
 
     def get(self, response_id: str) -> dict[str, Any]:
         _require_id(response_id, "response ID")
         response = self.session.get(
-            f"{self.base_url}/v1/responses/{response_id}", timeout=self.timeout
+            f"{self.base_url}/v1/responses/{response_id}",
+            timeout=self.timeout,
+            allow_redirects=False,
         )
         payload = _require_status(response, {200})
         if payload is None:
@@ -216,7 +263,9 @@ class JVResponsesClient:
             return
         try:
             response = self.session.post(
-                f"{self.base_url}/v1/auth/logout", timeout=self.timeout
+                f"{self.base_url}/v1/auth/logout",
+                timeout=self.timeout,
+                allow_redirects=False,
             )
             _require_status(response, {204})
         finally:
@@ -281,13 +330,33 @@ def _continuation(previous_id: str, call_id: str, result: str) -> dict[str, Any]
     }
 
 
+class AttachmentAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        items = list(getattr(namespace, self.dest, None) or [])
+        items.append((option_string, values))
+        setattr(namespace, self.dest, items)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("question")
     parser.add_argument("--tool-demo", action="store_true")
+    parser.add_argument(
+        "--file", "--image", dest="attachments", action=AttachmentAction
+    )
+    parser.add_argument("--image-detail", choices=("auto", "high"), default="auto")
+    parser.add_argument(
+        "--idempotency-key",
+        default=None,
+        help="Retain this key and exact input for ambiguous submission recovery",
+    )
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--base-url", default=os.getenv("JV_API_BASE_URL", DEFAULT_BASE_URL))
-    parser.add_argument("--username", default=os.getenv("JV_API_USERNAME", DEFAULT_USERNAME))
+    parser.add_argument(
+        "--base-url", default=os.getenv("JV_API_BASE_URL", DEFAULT_BASE_URL)
+    )
+    parser.add_argument(
+        "--username", default=os.getenv("JV_API_USERNAME", DEFAULT_USERNAME)
+    )
     parser.add_argument("--poll-interval", type=float, default=3.0)
     parser.add_argument("--wait-timeout", type=float, default=3600.0)
     args = parser.parse_args()
@@ -303,9 +372,38 @@ def main() -> int:
         client.login(args.username, password)
         print(f"Authenticated as {args.username}.", file=sys.stderr)
 
-        created = client.create(
-            _tool_request(args.question) if args.tool_demo else _base_request(args.question)
+        body = (
+            _tool_request(args.question)
+            if args.tool_demo
+            else _base_request(args.question)
         )
+        key = args.idempotency_key or _idempotency_key()
+        if (
+            not 1 <= len(key) <= 100
+            or not key.isascii()
+            or not all(c.isalnum() or c in "_.:-" for c in key)
+        ):
+            raise JVAPIError("CLI idempotency key must be 1–100 safe ASCII characters")
+        print(f"Logical request key: {key}", file=sys.stderr)
+        attachments = args.attachments or []
+        if (
+            len(attachments) > 6
+            or sum(k == "--file" for k, _ in attachments) > 4
+            or sum(k == "--image" for k, _ in attachments) > 4
+        ):
+            raise JVAPIError("At most 4 files, 4 images and 6 mixed attachments")
+        if attachments:
+            parts = (
+                [{"type": "input_text", "text": args.question}] if args.question else []
+            )
+            for index, (kind, path) in enumerate(attachments):
+                if kind == "--image":
+                    parts.append(image_part(path, args.image_detail))
+                else:
+                    staged = client.stage_file(path, f"{key}-upload-{index}")
+                    parts.append({"type": "input_file", "file_id": staged["id"]})
+            body["input"][0]["content"] = parts
+        created = client.create(body, key)
         response_id = created["id"]
         print(f"Created structured response {response_id}.", file=sys.stderr)
         terminal = client.wait(
@@ -320,7 +418,9 @@ def main() -> int:
                 f"Executing allowlisted local tool {CLIENT_TOOL_NAME}; JV Server does not execute it.",
                 file=sys.stderr,
             )
-            created = client.create(_continuation(response_id, call_id, tool_result))
+            created = client.create(
+                _continuation(response_id, call_id, tool_result), f"{key}-continuation"
+            )
             response_id = created["id"]
             print(f"Created continuation response {response_id}.", file=sys.stderr)
             terminal = client.wait(
@@ -330,9 +430,11 @@ def main() -> int:
                 lambda value: print(f"Status: {value['status']}", file=sys.stderr),
             )
         answer = _text_output(terminal)
-        print(json.dumps(terminal, ensure_ascii=False, indent=2) if args.json else answer)
+        print(
+            json.dumps(terminal, ensure_ascii=False, indent=2) if args.json else answer
+        )
         return 0
-    except (JVAPIError, requests.RequestException) as exc:
+    except (JVAPIError, requests.RequestException, OSError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

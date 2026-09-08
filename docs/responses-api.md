@@ -116,8 +116,8 @@ tool round is allowed. Tool results are untrusted input to inference.
   `parallel_tool_calls:false` are required.
 - `model` is the generic `jv-ai`; clients cannot override provider, model, or
   effort.
-- Input is text-only. Files, generated-file downloads, and legacy conversation
-  IDs remain on `/v1/jobs`.
+- Input supports text, images and staged files. Generated-file downloads and
+  legacy conversation IDs remain on `/v1/jobs`.
 - There is no SSE, synchronous wait, cancellation, usage object, hidden
   reasoning, or full SDK compatibility in this pilot.
 - Tool output appears only after terminal provider success and strict server
@@ -125,6 +125,64 @@ tool round is allowed. Tool results are untrusted input to inference.
   repair or resend.
 - A response continuation is owner-scoped and must follow the latest completed
   response in that structured conversation.
+
+## Structured attachments
+
+Stage one file with `POST /v1/files`, multipart part `file`, bearer auth,
+`X-JV-CSRF: 1` and a separate upload `Idempotency-Key`. Let the HTTP library
+generate the multipart boundary. The returned safe object contains `id`,
+`object:"file"`, `bytes`, `filename`, `media_type`, `created_at`, `expires_at`.
+Its ID is opaque, immutable and owner-scoped; no server path or digest is public.
+
+User content can contain ordered parts:
+
+```json
+[
+  {"type":"input_text","text":"Compare the attachments."},
+  {"type":"input_image","image_url":"data:image/png;base64,<encoded bytes>","detail":"auto"},
+  {"type":"input_file","file_id":"file_opaque"}
+]
+```
+
+Replace placeholders with actual bytes and the returned ID. Attachment-only
+user content is valid. References remain associated with their message and
+content positions; identical bytes/type may share a provider upload. Ordinary
+tool continuation sends only `function_call_output` and `previous_response_id`,
+without re-uploading the original files/images.
+
+| Format | MIME |
+|---|---|
+| PNG/JPEG/WebP | image/png, image/jpeg, image/webp |
+| TXT/Markdown | text/plain, text/markdown |
+| PDF | application/pdf |
+| JSON/CSV/Python `.py` | application/json, text/csv, text/x-python |
+| DOCX | application/vnd.openxmlformats-officedocument.wordprocessingml.document |
+| XLSX | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet |
+| PPTX | application/vnd.openxmlformats-officedocument.presentationml.presentation |
+
+Images: detail `auto` or `high` only; 4 images, 5 MiB each, 12 MiB total decoded;
+6,990,508 base64 characters/image; 17 MiB Responses request ceiling with images.
+Files: 4 references, 10 MiB each, 20 MiB total. Combined: 6 attachments, 24 MiB.
+One staged file per 11 MiB multipart request. Owner staging quota: 10 files /
+50 MiB. Staging TTL: 2 hours; canonical attachment context: fixed 24-hour window.
+Active work is protected during cleanup; expired context is rejected, not
+silently omitted. Structured metadata remains separately bounded.
+
+Central checks MIME/extension/content and fully validates images. Office support
+is a conservative ZIP/XML subset: no macros, embedded objects, encryption,
+external relationships, unsafe entries or excessive expansion. Client signature
+preflight is not full certification. Uploaded source/formulas are never executed
+by JV Server.
+
+Structured attachments currently require a ChatGPT-capable account assignment;
+Gemini structured attachments fail closed. Clients cannot override routing.
+Standalone HTML/XML, JS/TS/Rust/C/C++/Java/Go and shell/config extensions,
+arbitrary archives/executables, SVG, audio/video and macro-enabled Office are
+unsupported. Do not disguise extensions. Remote URLs, file_url, file_data,
+file:// and server paths are unsupported; no remote fetching occurs.
+
+Coding-agent adapters can implement this JV subset; unmodified Codex, streaming,
+hosted tools and MCP are not promised.
 
 ## Idempotency and failure handling
 

@@ -1,17 +1,13 @@
-name: Python C and C++
+name: Python
 
 on:
   push:
     paths:
       - 'python/**'
-      - 'c/**'
-      - 'cpp/**'
       - '.github/workflows/examples.yml'
   pull_request:
     paths:
       - 'python/**'
-      - 'c/**'
-      - 'cpp/**'
       - '.github/workflows/examples.yml'
   workflow_dispatch:
 
@@ -28,18 +24,8 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake gcc g++ libcurl4-openssl-dev libjson-c-dev nlohmann-json3-dev
           python -m pip install -r python/requirements.txt
       - name: Test Python
         run: |
-          python -m unittest python.test_jv_responses_example -v
+          python -m unittest discover -s python -p 'test_*.py' -v
           python -m compileall -q python
-      - name: Build C
-        run: |
-          cmake -S c -B c/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build c/build --parallel
-      - name: Build C++
-        run: |
-          cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build cpp/build --parallel

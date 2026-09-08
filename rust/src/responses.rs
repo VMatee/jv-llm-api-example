@@ -118,6 +118,10 @@ impl AgentResponse {
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum ResponseInput {
+    ContentMessage {
+        role: String,
+        content: Vec<crate::InputContent>,
+    },
     Message {
         role: String,
         content: String,

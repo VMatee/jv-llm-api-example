@@ -209,6 +209,101 @@ async fn structured_response_submission_poll_and_tool_continuation() {
 }
 
 #[tokio::test]
+async fn staged_file_mixed_content_and_continuation_http() {
+    use jv_ai_client::{InputContent, ResponseInput, local_image};
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("facts.json");
+    std::fs::write(&path, b"{\"count\":17}").unwrap();
+    let picture = temp.path().join("scene.png");
+    image::RgbImage::from_pixel(4, 4, image::Rgb([0, 255, 0]))
+        .save(&picture)
+        .unwrap();
+    let file_id = format!("file_{}", "A".repeat(43));
+    let call = agent_response(
+        "r1",
+        "completed",
+        json!([{"type":"function_call","id":"fc1","call_id":"call1","status":"completed","name":"get_client_platform","arguments":"{}"}]),
+    );
+    let message = agent_response(
+        "r2",
+        "completed",
+        json!([{"type":"message","id":"m1","status":"completed","role":"assistant","content":[{"type":"output_text","text":"done"}]}]),
+    );
+    let mock=Mock::start(vec![login(),Reply::json(201,json!({"id":file_id,"object":"file","bytes":12,"filename":"facts.json","media_type":"application/json","created_at":1,"expires_at":7201})),Reply::json(202,agent_response("r1","queued",json!([]))),Reply::json(200,call),Reply::json(202,agent_response("r2","queued",json!([]))),Reply::json(200,message),logout()]).await;
+    let mut client = mock.client();
+    client.login("u", "p").await.unwrap();
+    let staged = client.stage_file(&path, "upload-1").await.unwrap();
+    let image = local_image(&picture, "high").unwrap();
+    assert!(!format!("{image:?}").contains("base64"));
+    let mut request = ResponseRequest::text("read");
+    request.input = vec![ResponseInput::ContentMessage {
+        role: "user".into(),
+        content: vec![
+            InputContent::InputFile { file_id: staged.id },
+            image,
+            InputContent::InputText {
+                text: "read".into(),
+            },
+        ],
+    }];
+    let first = client.submit_response(&request, "round-1").await.unwrap();
+    let first = client.wait_for_response(&first.id).await.unwrap();
+    let (call_id, _, _) = first.function_call().unwrap();
+    let second = client
+        .submit_response(
+            &ResponseRequest::continuation(&first.id, call_id, "ok"),
+            "round-2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        client
+            .wait_for_response(&second.id)
+            .await
+            .unwrap()
+            .output_text()
+            .unwrap(),
+        "done"
+    );
+    client.logout().await.unwrap();
+    mock.complete();
+    let recorded = mock.state.requests.lock().unwrap();
+    assert_eq!(recorded[1].path, "/v1/files");
+    assert_eq!(recorded[1].headers["idempotency-key"], "upload-1");
+    assert!(recorded[1].headers.contains_key("authorization"));
+    assert_eq!(recorded[1].headers["x-jv-csrf"], "1");
+    let upload = String::from_utf8_lossy(&recorded[1].body);
+    assert!(
+        upload.contains("filename=\"facts.json\"")
+            && upload.contains("application/json")
+            && upload.contains("{\"count\":17}")
+    );
+    let body: Value = serde_json::from_slice(&recorded[2].body).unwrap();
+    assert_eq!(body["input"][0]["content"][0]["file_id"], file_id);
+    assert_eq!(body["input"][0]["content"][1]["detail"], "high");
+    let follow: Value = serde_json::from_slice(&recorded[4].body).unwrap();
+    assert_eq!(follow["previous_response_id"], "r1");
+    assert!(!follow.to_string().contains("file_id"));
+}
+
+#[tokio::test]
+async fn staging_ambiguous_response_is_not_retried() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("facts.txt");
+    std::fs::write(&path, b"facts").unwrap();
+    let mock = Mock::start(vec![login(), Reply::raw(201, "not JSON"), logout()]).await;
+    let mut client = mock.client();
+    client.login("u", "p").await.unwrap();
+    assert!(matches!(
+        client.stage_file(&path, "keep-key").await,
+        Err(Error::ResponseSubmissionUncertain { .. })
+    ));
+    client.logout().await.unwrap();
+    mock.complete();
+    assert_eq!(mock.state.requests.lock().unwrap().len(), 3);
+}
+
+#[tokio::test]
 async fn full_flow_auth_multipart_files_followup_and_logout() {
     let mut ready = job("job-1", "thread-1", "running");
     ready["result_ready"] = json!(true);

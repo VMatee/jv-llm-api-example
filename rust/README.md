@@ -47,6 +47,19 @@ The reusable library exposes `ResponseRequest`, `FunctionTool`, `ToolChoice`,
 Callers provide and retain each idempotency key. `AgentResponse::output_text`
 and `function_call` fail closed when terminal output has the wrong type.
 
+Structured mixed inputs:
+
+```bash
+cargo run --manifest-path rust/Cargo.toml --bin jv-responses-example -- \
+  "Compare these inputs." --attach image:screenshot.png --attach file:report.pdf --tool-demo
+```
+
+Repeat `--attach` in the intended order. `--image-detail` accepts auto/high;
+`--idempotency-key` supplies a stable logical round key. The library exposes
+`stage_file`, `StagedFile`, `local_image`, `InputContent` and
+`ResponseInput::ContentMessage`. Client checks are bounded preflight; the server
+performs full format admission. Continuation does not resend attachments.
+
 ## Legacy jobs CLI
 
 ### Login and ask a question
