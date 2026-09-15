@@ -7,7 +7,7 @@ Async reusable `jv_ai_client` library with two CLIs:
 - `jv-api-example` preserves multipart `/v1/jobs`, polling, conversation
   follow-ups, authenticated response-file downloads, and logout.
 
-Server-side account assignments control provider/model selection for both.
+Available service capabilities are managed by your account administrator.
 
 ## Install and build
 
@@ -46,13 +46,6 @@ The reusable library exposes `ResponseRequest`, `FunctionTool`, `ToolChoice`,
 `AgentResponse`, `submit_response`, `get_response`, and `wait_for_response`.
 Callers provide and retain each idempotency key. `AgentResponse::output_text`
 and `function_call` fail closed when terminal output has the wrong type.
-
-`ResponseRequest::image_tool_continuation` serializes the certified
-image-bearing function result. `CustomTool::codex_0_149_1_apply_patch`,
-`AgentResponse::custom_tool_call`, and
-`ResponseRequest::custom_tool_continuation` cover the exact pinned custom
-declaration/call/result wire forms. They do not parse or execute patches; that
-remains the client's sandboxed, approval-controlled responsibility.
 
 Structured mixed inputs:
 
@@ -168,7 +161,7 @@ cargo run --manifest-path rust/Cargo.toml -- \
 
 Artifacts are downloaded before logout. `files` contains API metadata and
 `downloaded_files` contains local paths. No files is a valid result, including
-for providers that do not produce downloadable artifacts.
+when the service does not produce downloadable files.
 
 Download checks match Python's contract and reject unsafe routes more strictly:
 
@@ -324,7 +317,7 @@ cargo build --manifest-path rust/Cargo.toml --release
 ```
 
 The Rust GitHub Actions workflow runs all four checks. Tests use loopback mock
-HTTP servers and fake credentials; they never start a browser worker or submit
+HTTP servers and fake credentials; they never submit
 live jobs. Coverage includes authentication headers/body, multipart with and
 without files, two-turn conversation handling, nonterminal result_ready,
 409/429/Retry-After, uncertain POST no-retry, timeout, malformed responses,
@@ -350,4 +343,4 @@ unset JV_API_LIVE_PROMPT JV_API_LIVE_REQUIRE_FILES
 ```
 
 The strict variant fails if no artifact is returned. Successful mock tests do not
-claim live-provider verification; live tests require independent credentials.
+claim live-service verification; live tests require independent credentials.

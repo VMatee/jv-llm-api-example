@@ -5,8 +5,7 @@ text/attachment/agent example. `jv_api_example.py` preserves the full `/v1/jobs`
 for attachments, legacy conversation follow-ups, and verified response-file
 downloads.
 
-Provider, model, and reasoning controls are intentionally absent. The server
-uses the authenticated user's administrator-managed assignment.
+Available service capabilities are managed by your account administrator.
 
 Complete platform setup: [Linux](../docs/linux.md) ·
 [macOS](../docs/macos.md) · [Windows](../docs/windows.md)
@@ -62,13 +61,6 @@ The Python API is importable as `JVResponsesClient`; `_base_request`,
 `_tool_request`, and `_continuation` show the exact pilot payloads. Production
 applications should define public request types and persist processed call IDs
 rather than importing underscore-prefixed example helpers.
-
-`_image_tool_continuation` serializes the certified `view_image` content-array
-result. `_custom_tool_request`, `_custom_tool_call`, and `_custom_continuation`
-demonstrate the exact pinned Codex `0.149.1` declaration/call/result shapes.
-They never execute a patch; client applications must validate and execute the
-opaque request under their own sandbox and approval rules. The exact grammar is
-[`examples/codex-0.149.1-apply-patch.lark`](../examples/codex-0.149.1-apply-patch.lark).
 
 ## Legacy jobs, files, and conversations
 

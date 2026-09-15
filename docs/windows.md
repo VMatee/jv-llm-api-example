@@ -1,6 +1,6 @@
 # Windows setup
 
-Install Git, Python 3.10+ and Rust/Cargo. Follow Rust's installer instructions
+Install Git, Python 3.10+ and Rust/Cargo with edition 2024 support. Follow Rust's installer instructions
 for the native MSVC linker/build prerequisites. These are compiler dependencies,
 not maintained C/C++ clients. In PowerShell:
 

@@ -1,20 +1,13 @@
-# OFFLINE PROPOSED EXTENSION — NOT DEPLOYED OR CERTIFIED
+# JV Responses API reference
 
-Published for design review only. The proposed working-set semantics below do
-not establish a deployed server contract or client production acceptance.
-
-# JV structured Responses API pilot
-
-JV Server exposes an additive, asynchronous compatibility layer at:
+Use the asynchronous Responses API to submit text and supported attachments, poll for results, and continue with client-side tool results.
 
 ```text
 POST /v1/responses
 GET  /v1/responses/{response_id}
 ```
 
-It follows the useful parts of the Responses object model while preserving
-JV's long-running queue and browser-provider architecture. It is a deliberate
-pilot subset, not a drop-in implementation of every OpenAI Responses feature.
+This reference describes the supported JV API subset. Account capabilities and deployment limits apply; unsupported features are rejected rather than silently enabled.
 
 ## Authentication and submission
 
@@ -118,8 +111,8 @@ tool round is allowed. Tool results are untrusted input to inference.
 ### Image-bearing function results (`view_image`)
 
 The string-valued `function_call_output` above remains supported unchanged.
-Pinned Codex `0.149.1` can also return an image from its client-side
-`view_image` function as this exact structured subset:
+A client-side `view_image` function can return an image using the following
+structured result format:
 
 ```json
 {
@@ -154,33 +147,27 @@ arbitrary Responses content arrays.
 Images use the same validation and private attachment lifecycle as ordinary
 `input_image`: strict canonical base64, MIME/container agreement, complete
 single-frame decode, at most 8192 pixels per axis and 16 million pixels, 5 MiB
-per decoded image, 12 MiB active image total, and four active image binaries.
-The offline working-set extension retains the four most recently observed distinct
-images; older observations remain reference-only transport metadata in compiled
-history. They are not visual descriptions. Reinspection requires a new client
-`view_image` call/result. Canonical history is not rewritten. The complete image-bearing request is capped at 17 MiB;
+per decoded image, 12 MiB total, and four images. Confirm cumulative
+conversation limits with your service administrator before processing longer histories.
+Do not assume that earlier image content stays available indefinitely. If your
+application needs to inspect an image again, return it through a new
+`view_image` call/result and respect the service limits. The complete image-bearing request is capped at 17 MiB;
 normalized structured metadata remains capped at 64 KiB. The general combined
 attachment limits below also apply.
 
-`view_image` executes on the client under its filesystem sandbox. JV Server
-receives only its result, preserves the image's role and call association, and
-sends the exact validated image bytes through the existing provider attachment
-abstraction. It does not read the client path, execute `view_image`, OCR the
-image, replace it with text, or log raw base64. Canonical protocol data stores
-safe MIME, size, digest, and private artifact identity metadata.
+`view_image` runs on the client under your application's filesystem permissions.
+The service receives only the submitted result, not unrestricted access to the
+client filesystem. Keep local image data and saved request state private.
 
 An exact retry uses the same owner-scoped idempotency key, body, call ID, and
 image bytes and returns the existing response. Changed bytes or any changed
 logical body with the same key returns a conflict. A new continuation requires
 a new key.
 
-### Certified custom/freeform tool (`apply_patch`)
+### Custom/freeform tool (`apply_patch`)
 
-The only certified custom tool is the pinned Codex `0.149.1` `apply_patch`
-declaration. Its grammar is retained verbatim in
-[`examples/codex-0.149.1-apply-patch.lark`](../examples/codex-0.149.1-apply-patch.lark),
-whose SHA-256 is
-`d6367f4826ed608c424b0a308f3d6163527df63c22513d089b91863552f8bfeb`:
+The supported custom tool is `apply_patch`. Use the exact declaration and
+grammar below; arbitrary custom grammars are not supported.
 
 ```json
 {
@@ -195,14 +182,13 @@ whose SHA-256 is
 }
 ```
 
-The linked grammar bytes are the `definition` string; line endings and final
+Use the exact `definition` string; line endings and final
 newline are significant. JV rejects another grammar digest, syntax, format,
 unknown custom-tool fields or undeclared name. JSON function tools and this
-custom tool share the existing limit of 16 unique declarations. This narrowly
-certifies the captured `apply_patch` form and does not advertise general custom
+custom tool share the existing limit of 16 unique declarations. Only this `apply_patch` form is supported; this does not imply general custom
 tool compatibility.
 
-After provider inference, a validated call is published as:
+A completed response can return a validated call in this format:
 
 ```json
 {
@@ -248,18 +234,18 @@ remain enforced. Exact same-key replay returns the existing response; changed
 result text, including whitespace, conflicts. Resend declarations and choose
 `auto` or `required` only when another tool call should be permitted.
 
-## Current boundaries
+## Supported features and limits
 
 - `background:true`, `store:true`, `stream:false`, and
   `parallel_tool_calls:false` are required.
-- `model` is the generic `jv-ai`; clients cannot override provider, model, or
-  effort.
+- `model` is the generic `jv-ai`; service options are controlled by the account
+  assignment and cannot be overridden in the request.
 - Input supports text, images, staged files, JSON function tools, the certified
   image-bearing function result, and the certified custom `apply_patch` flow.
   Generated-file downloads and legacy conversation IDs remain on `/v1/jobs`.
 - There is no SSE, synchronous wait, cancellation, usage object, hidden
   reasoning, or full SDK compatibility in this pilot.
-- Tool output appears only after terminal provider success and strict server
+- Tool output appears only after successful completion and response
   validation. A validation failure is terminal and cannot trigger an automatic
   repair or resend.
 - A response continuation is owner-scoped and must follow the latest completed
@@ -284,8 +270,7 @@ User content can contain ordered parts:
 ```
 
 Replace placeholders with actual bytes and the returned ID. Attachment-only
-user content is valid. References remain associated with their message and
-content positions; identical bytes/type may share a provider upload. Ordinary
+user content is valid. Attachment order and message association are preserved. Ordinary
 tool continuation sends only `function_call_output` and `previous_response_id`,
 without re-uploading the original files/images.
 
@@ -299,8 +284,8 @@ without re-uploading the original files/images.
 | XLSX | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet |
 | PPTX | application/vnd.openxmlformats-officedocument.presentationml.presentation |
 
-Images: detail `auto` or `high` only; 4 per request and 4 active images,
-5 MiB each, 12 MiB active total decoded;
+Images: detail `auto` or `high` only; 4 images,
+5 MiB each, 12 MiB total decoded;
 6,990,508 base64 characters/image; 17 MiB Responses request ceiling with images.
 Files: 4 references, 10 MiB each, 20 MiB total. Combined: 6 attachments, 24 MiB.
 One staged file per 11 MiB multipart request. Owner staging quota: 10 files /
@@ -308,23 +293,22 @@ One staged file per 11 MiB multipart request. Owner staging quota: 10 files /
 Active work is protected during cleanup; expired context is rejected, not
 silently omitted. Structured metadata remains separately bounded.
 
-Central checks MIME/extension/content and fully validates images. Office support
+The service checks MIME/extension/content and validates images. Office support
 is a conservative ZIP/XML subset: no macros, embedded objects, encryption,
 external relationships, unsafe entries or excessive expansion. Client signature
 preflight is not full certification. Uploaded source/formulas are never executed
 by JV Server.
 
-Structured attachments currently require a ChatGPT-capable account assignment;
-Gemini structured attachments fail closed. Clients cannot override routing.
+Structured attachments require a compatible account capability. If the service
+rejects an attachment capability, ask your administrator; clients cannot override
+account settings.
 Standalone HTML/XML, JS/TS/Rust/C/C++/Java/Go and shell/config extensions,
 arbitrary archives/executables, SVG, audio/video and macro-enabled Office are
 unsupported. Do not disguise extensions. Remote URLs, file_url, file_data,
 file:// and server paths are unsupported; no remote fetching occurs.
 
-Coding-agent adapters can implement this JV subset. These core wire forms were
-certified against pinned Codex `0.149.1`; complete unmodified Codex compatibility,
-streaming, parallel calls, hosted tools, all custom tools, audio/video and MCP
-are not promised.
+Use only the documented request and response shapes. Unsupported content,
+streaming, parallel calls, and unlisted tool formats are not supported by this API.
 
 ## Idempotency and failure handling
 
@@ -339,8 +323,5 @@ key. GET polling can be retried safely and should respect `Retry-After`. A local
 poll timeout leaves server work running.
 
 On `failed`, inspect the safe `error.code` and `error.message`; `output` remains
-empty. Raw browser-provider protocol text and hidden reasoning are never public.
-
-The proposed active-vs-historical semantics do not raise task budgets. Central
-freezes a 40-round default conversation budget (`COMBINED_AGENT_MAX_ROUNDS`,
-range 1–500). Eviction and reinspection do not reset that budget.
+empty. Use the returned error code and message for diagnostics; do not depend on
+undocumented response fields.

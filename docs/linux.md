@@ -1,6 +1,6 @@
 # Linux setup
 
-Install Git, Python 3.10+ and Rust/Cargo, plus your distribution's native linker
+Install Git, Python 3.10+ and Rust/Cargo with edition 2024 support, plus your distribution's native linker
 and build tools for Rust compilation.
 
 ```bash

@@ -1,6 +1,6 @@
 # macOS setup
 
-Install Git, Python 3.10+ and Rust/Cargo. Apple's command-line developer tools
+Install Git, Python 3.10+ and Rust/Cargo with edition 2024 support. Apple's command-line developer tools
 provide Rust's native linker (`xcode-select --install`).
 
 ```bash

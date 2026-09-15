@@ -1,79 +1,58 @@
-# JV LLM API — Python and Rust
+# JV LLM API examples
 
-Maintained reference clients for JV Server's asynchronous `/v1/responses` and
-established `/v1/jobs` APIs. C/C++ examples were retired and remain in Git history.
+Python and Rust examples for connecting your application to JV: send prompts, attach documents or images, check results, and continue a conversation.
 
-Structured input supports text, images, staged files, ordered mixed content,
-JSON function tools, image-bearing `view_image` result continuation, and the
-custom/freeform `apply_patch` flow certified for pinned Codex `0.149.1`.
-This is a documented JV subset, **not a drop-in OpenAI Responses implementation
-or complete unmodified Codex compatibility**. JV CLI integration remains separate.
+## Choose your client
 
-## Start
+| Language | Get started | Requirements |
+| --- | --- | --- |
+| Python | [Python guide](python/README.md) | Python 3.10+ |
+| Rust | [Rust guide](rust/README.md) | Rust/Cargo with edition 2024 support |
 
-See [Python](python/README.md), [Rust](rust/README.md), and platform setup for
-[Linux](docs/linux.md), [macOS](docs/macos.md), [Windows](docs/windows.md).
-Run from this repository root:
+Setup guides: [Linux](docs/linux.md) · [macOS](docs/macos.md) · [Windows](docs/windows.md).
+
+You need an existing JV account and internet access. The default service address is `https://ai.openjvspace.com`. Account capabilities are managed by your service administrator.
+
+## Quick start with Python
+
+```bash
+git clone https://github.com/VMatee/jv-llm-api-example.git
+cd jv-llm-api-example
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r python/requirements.txt
+python python/jv_responses_example.py "Explain recursion." --username your-user
+```
+
+On Windows, use `.venv\Scripts\Activate.ps1` to activate the environment. The client asks for your password using hidden input. The illustrative default username `test` does not create an account.
+
+## Send a document or image
 
 ```bash
 python python/jv_responses_example.py "Summarize this document." --file examples/sample-document.txt
+python python/jv_responses_example.py "Compare these attachments." --image screenshot.png --file report.pdf
+```
+
+For Rust:
+
+```bash
 cargo run --manifest-path rust/Cargo.toml --bin jv-responses-example -- "Summarize this document." --attach file:examples/sample-document.txt
 ```
 
-The origin defaults to `https://ai.openjvspace.com`. Choose your account with
-`--username`; the illustrative default `test` does not create an account.
-Passwords use a hidden prompt, never an argument. Approved automation may
-supply `JV_API_PASSWORD` through a secret manager. Never commit credentials,
-tokens, local notes, `.env` files or production request content.
+Repeat attachment options to include multiple inputs; their order is preserved. PNG, JPEG, WebP, text, Markdown, PDF, JSON, CSV, Python source, and selected Office files are supported subject to account capabilities and validation limits. See the [API reference](docs/responses-api.md) for exact limits.
 
-## Mixed attachments and tools
+## Available workflows
 
-```bash
-python python/jv_responses_example.py "Compare these attachments." --image screenshot.png --file report.pdf --tool-demo
-cargo run --manifest-path rust/Cargo.toml --bin jv-responses-example -- "Compare these attachments." --attach image:screenshot.png --attach file:report.pdf --tool-demo
-```
+- **Responses:** asynchronous text and attachment requests, status polling, and client-executed tool continuation.
+- **Jobs:** direct requests, follow-up conversations, and generated-file downloads using `python/jv_api_example.py` or the Rust `jv-api-example` command.
+- **Tool demonstration:** add `--tool-demo` to run a fixed local platform-information function. Always validate and explicitly allow client-side tool actions in your own application.
 
-Repeat attachment options; their order is preserved. Both clients support
-`--image-detail auto|high`. Empty quoted text with attachments creates
-attachment-only input. `--tool-demo` runs only a fixed local platform function;
-the server never executes tools or uploaded source. Tool continuation retains
-the original attachments without requiring the client to resend them.
+These examples implement the documented JV API features. Do not assume compatibility with every feature in other SDKs or services.
 
-The Python and Rust libraries also include protocol-only constructors and tests
-for image-bearing function results and pinned `apply_patch` custom calls/results.
-They do not execute patches. See the exact certified shapes and limits in the
-[Responses contract](docs/responses-api.md).
+## Credentials, retries, and results
 
-Certified input: PNG/JPEG/WebP; TXT, Markdown, PDF, JSON, CSV, Python source,
-and conservative DOCX/XLSX/PPTX. Server validation, not extensions alone,
-determines admission. Unsupported provider assignments fail without rerouting.
-See [exact contract, limits and capability boundaries](docs/responses-api.md).
+Use hidden password input. Approved automation may obtain `JV_API_PASSWORD` from a protected secret manager. Never put passwords in command-line arguments or commit credentials, tokens, `.env` files, or private request content.
 
-Legacy `python/jv_api_example.py` and Rust `jv-api-example` remain available for
-`/v1/jobs`, legacy conversations and generated-file downloads.
+For Responses requests, retain `--idempotency-key YOUR-STABLE-KEY` and the exact original input when reconciling an uncertain submission. Starting a new key may create duplicate work. Polling timeouts do not cancel remote work. File staging expires after two hours; see the API reference before implementing durable workflows.
 
-## Retry and logging
-
-Use `--idempotency-key YOUR-STABLE-KEY` and retain the exact input. Upload and
-continuation keys derive from that key. Never retry uncertain work with a new
-key. Libraries should persist staged IDs, each request and each round's key
-privately; CLI examples are not durable workflow journals. In particular,
-staging expires after two hours. POSTs are not automatically retried. Polling
-timeout does not cancel server work.
-
-Accepted server requests/results have private, owner-scoped canonical records.
-Attachment bytes have bounded retention, not ordinary-log/base64 dumps.
-Rejected requests do not necessarily create an inference history entry.
-No production logs or credentials belong in this repository.
-
-## Tests
-
-```bash
-python -m unittest discover -s python -p 'test_*.py'
-cargo test --manifest-path rust/Cargo.toml
-cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
-```
-
-Normal tests use local fixtures/mock servers. Live tests are opt-in. Server
-production acceptance used a bounded internal Rust probe; public clients have
-their own offline tests.
+Review results before relying on them. Service availability and supported capabilities depend on your account. Follow the [verification guide](docs/verification.md) to run local checks.

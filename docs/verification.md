@@ -1,26 +1,17 @@
-# Verification scope — 2026-09-08
+# Verify the examples
 
-This records bounded checks, not a claim that software is perfect or that all
-Codex/OpenAI protocol features are supported.
+Run from the repository root after installing the dependencies:
 
-- Server's full preceding regression: 474 central tests passed, 1 skipped;
-  258 ChatGPT and 271 Gemini provider tests passed.
-- Server production acceptance: source/data (Python + JSON), Office
-  (DOCX + XLSX + PPTX), and mixed image + CSV + DOCX through a client tool
-  continuation. Three flows, four inference rounds; original attachment-only
-  facts were recovered and actual image relationships were interpreted.
-- Private canonical audit: all 24 existing structured request records verified
-  against their stored request/context and successful answer content; no
-  integrity issues. Retention/expiry rules still apply. Rejected HTTP requests
-  are not necessarily inference/history records.
-- Public Python client: 6 offline tests passed, including real loopback HTTP
-  staging, mixed content, polling and continuation.
-- Public Rust client: 28 offline tests passed; 1 live integration test intentionally
-  ignored; Clippy with warnings denied passed.
-- Provider/browser implementations and JV CLI were not changed. No additional
-  provider inference was spent merely to publish the client examples.
+```bash
+python -m unittest discover -s python -p 'test_*.py'
+python -m compileall -q python
+cargo fmt --manifest-path rust/Cargo.toml -- --check
+cargo test --manifest-path rust/Cargo.toml --locked
+cargo clippy --manifest-path rust/Cargo.toml --locked --all-targets --all-features -- -D warnings
+```
 
-The public clients have offline HTTP proof; the live server attachment proof
-used the internal Rust acceptance client, not these public binaries. Native
-Codex integration and unsupported attachment families remain separate work.
-Production credentials, request bytes and private logs are excluded from Git.
+Use a Rust toolchain that supports edition 2024, with the formatting and linting components installed. The normal tests use local fixtures and mock HTTP services. Live integration tests are opt-in and can consume account quota.
+
+Before integrating the examples into your application, verify authentication, supported file types and limits, status handling, idempotent retries, and download validation for your own account. Keep test credentials synthetic and production data out of the repository.
+
+Passing automated tests does not guarantee live availability or every account capability. These are reference examples; durable applications need their own secure storage, retry policy, and operational monitoring.
