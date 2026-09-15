@@ -1,3 +1,8 @@
+# OFFLINE PROPOSED EXTENSION — NOT DEPLOYED OR CERTIFIED
+
+Published for design review only. The proposed working-set semantics below do
+not establish a deployed server contract or client production acceptance.
+
 # JV structured Responses API pilot
 
 JV Server exposes an additive, asynchronous compatibility layer at:
@@ -149,8 +154,11 @@ arbitrary Responses content arrays.
 Images use the same validation and private attachment lifecycle as ordinary
 `input_image`: strict canonical base64, MIME/container agreement, complete
 single-frame decode, at most 8192 pixels per axis and 16 million pixels, 5 MiB
-per decoded image, 12 MiB image total, and four images across current and
-replayed context. The complete image-bearing request is capped at 17 MiB;
+per decoded image, 12 MiB active image total, and four active image binaries.
+The offline working-set extension retains the four most recently observed distinct
+images; older observations remain reference-only transport metadata in compiled
+history. They are not visual descriptions. Reinspection requires a new client
+`view_image` call/result. Canonical history is not rewritten. The complete image-bearing request is capped at 17 MiB;
 normalized structured metadata remains capped at 64 KiB. The general combined
 attachment limits below also apply.
 
@@ -291,7 +299,8 @@ without re-uploading the original files/images.
 | XLSX | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet |
 | PPTX | application/vnd.openxmlformats-officedocument.presentationml.presentation |
 
-Images: detail `auto` or `high` only; 4 images, 5 MiB each, 12 MiB total decoded;
+Images: detail `auto` or `high` only; 4 per request and 4 active images,
+5 MiB each, 12 MiB active total decoded;
 6,990,508 base64 characters/image; 17 MiB Responses request ceiling with images.
 Files: 4 references, 10 MiB each, 20 MiB total. Combined: 6 attachments, 24 MiB.
 One staged file per 11 MiB multipart request. Owner staging quota: 10 files /
@@ -331,3 +340,7 @@ poll timeout leaves server work running.
 
 On `failed`, inspect the safe `error.code` and `error.message`; `output` remains
 empty. Raw browser-provider protocol text and hidden reasoning are never public.
+
+The proposed active-vs-historical semantics do not raise task budgets. Central
+freezes a 40-round default conversation budget (`COMBINED_AGENT_MAX_ROUNDS`,
+range 1–500). Eviction and reinspection do not reset that budget.
